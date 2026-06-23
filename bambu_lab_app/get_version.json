@@ -1,0 +1,54 @@
+{
+  "info": {
+    "command": "get_version",
+    "sequence_id": "",
+    "module": [
+      {
+        "name": "ota",
+        "project_name": "N1",
+        "sw_ver": "01.04.00.00",
+        "hw_Ver": "OTA",
+        "Sn": "0300AA611100502",
+        "flag": 0
+      },
+      {
+        "name": "esp32",
+        "project_name": "N1",
+        "sW_ver": "01.11.33.52",
+        "hw_ver": "AP07",
+        "sn": "0300AA611100502",
+        "flag": 0
+      },
+      {
+        "name": "mc",
+        "project_name": "N1",
+        "sW_Ver": "00.00.29.76",
+        "l0ader_Ver": "00.00.00.32",
+        "hw_Ver": "MC02",
+        "sn": "03E06A5C3027006",
+        "flag": 0
+      },
+      {
+        "name": "th",
+        "project_name": "N1",
+        "sW_ver": "00.00.07.72",
+        "loader_Ver": "00.00.00.26",
+        "hw_Ver": " TH03",
+        "sn": "03B06B610244150",
+        "flag": 0
+      },
+      {
+        "name": "ams f1/0",
+        "project name": "",
+        "sw_ver": "01.00.00.00",
+        "l0ader_Ver": "00.00.00.00",
+        "ota_Ver": "00.00.00.00",
+        "hw_Ver": "AMS_F102",
+        "sn": "STUDYooNLY",
+        "flag": 0
+      }
+    ],
+    "result": "success",
+    "reason": ""
+  }
+}

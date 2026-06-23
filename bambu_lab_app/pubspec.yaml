@@ -1,0 +1,49 @@
+name: bambu_lab_app
+description: "Bambu Lab 3D Printer Control App"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  # State management
+  provider: ^6.1.2
+  # MQTT communication
+  mqtt_client: ^10.6.0
+  # Database (SQLite)
+  drift: ^2.22.1
+  sqlite3_flutter_libs: ^0.5.28
+  path_provider: ^2.1.5
+  path: ^1.9.0
+  # Navigation
+  go_router: ^14.6.2
+  # UI
+  google_fonts: ^6.2.1
+  lucide_icons_flutter: ^3.1.14
+  ftpconnect: ^2.0.10
+  best_flutter_ui_templates:
+    path: ../Best-Flutter-UI-Templates/best_flutter_ui_templates
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+  drift_dev: ^2.22.1
+  build_runner: ^2.4.14
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/printer_images/
+    - bamboo_app_logo.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "D:\\python_project\\bambu-control\\bambu_lab_app\\bamboo_app_logo.png"
