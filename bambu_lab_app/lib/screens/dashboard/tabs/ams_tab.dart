@@ -1,7 +1,8 @@
-/// AMS 耗材管理 Tab（紧凑拟物 + 编辑能力）
+/// AMS 耗材管理 Tab（使用 flutter_neumorphism_ui）
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_neumorphism_ui/flutter_neumorphism_ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
@@ -11,7 +12,6 @@ import 'package:bambu_lab_app/models/filament_tray.dart';
 import 'package:bambu_lab_app/providers/ams_provider.dart';
 import 'package:bambu_lab_app/providers/printer_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
-import 'package:bambu_lab_app/widgets/neuo_card.dart';
 
 class AmsTab extends StatelessWidget {
   const AmsTab({super.key});
@@ -51,7 +51,9 @@ class _UnitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hclr = _hclr(ams.humidity);
-    return NeuoCard(depth: 4, intensity: 0.6, padding: const EdgeInsets.all(12),
+    return FlutterNeumorphism(
+      style: NeumorphismStyle(color: c.background, borderRadius: 14, depth: 5),
+      padding: const EdgeInsets.all(12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // 标题
         Row(children: [
@@ -64,14 +66,19 @@ class _UnitCard extends StatelessWidget {
           _chip(LucideIcons.thermometer, '${ams.temperature.toStringAsFixed(1)}°C', Colors.orange, c),
         ]),
         const SizedBox(height: 10),
-        // 料盘
+        // 料盘 - 显示所有4个槽位,未识别的显示占位符
         if (ams.filamentTrays.isEmpty)
           Text('无耗材信息', style: TextStyle(fontSize: 12, color: c.textSecondary))
         else
-          ...ams.filamentTrays.entries.map((t) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: _TrayCard(slot: t.key, tray: t.value, c: c),
-              )),
+          ...List.generate(4, (slotIndex) {
+            final tray = ams.filamentTrays[slotIndex];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: tray != null && tray.isValid
+                  ? _TrayCard(slot: slotIndex, tray: tray, c: c)
+                  : _EmptySlotCard(slot: slotIndex, c: c),
+            );
+          }),
       ]),
     );
   }
@@ -88,54 +95,74 @@ class _UnitCard extends StatelessWidget {
 }
 
 // ---- 单个料盘（可点击编辑）----
-class _TrayCard extends StatelessWidget {
+class _TrayCard extends StatefulWidget {
   const _TrayCard({required this.slot, required this.tray, required this.c});
   final int slot; final FilamentTray tray; final NeuoColors c;
+
+  @override
+  State<_TrayCard> createState() => _TrayCardState();
+}
+
+class _TrayCardState extends State<_TrayCard> {
+  bool _pressed = false;
 
   Color? _parse(String hex) {
     try {
       final clean = hex.replaceAll('#', '');
       if (clean.length == 6) return Color(int.parse('FF$clean', radix: 16));
+      if (clean.length == 8) return Color(int.parse(clean, radix: 16));
     } on FormatException {/* ignore */}
     return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final clr = _parse(tray.displayColor);
-    final has = tray.trayType.isNotEmpty;
+    final clr = _parse(widget.tray.displayColor);
+    final has = widget.tray.isValid;  // 使用isValid判断数据完整性
 
-    return NeuoCard(
-      onTap: () => _editDialog(context, slot, tray, c),
-      depth: 3, intensity: 0.5, borderRadius: 10,
-      padding: const EdgeInsets.all(10),
-      child: Row(children: [
-        Container(width: 32, height: 32,
-          decoration: BoxDecoration(
-            color: has ? (clr ?? c.textSecondary) : c.background,
-            shape: BoxShape.circle,
-            border: Border.all(color: c.textSecondary.withValues(alpha: 0.2), width: 2),
-            boxShadow: has ? [BoxShadow(color: (clr ?? c.textSecondary).withValues(alpha: 0.4), blurRadius: 4)] : [],
-          ),
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        _editDialog(context, widget.slot, widget.tray, widget.c);
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.c.background,
+          borderRadius: 10,
+          depth: _pressed ? 2 : 3,
+          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
         ),
-        const SizedBox(width: 10),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Text('#${slot + 1}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.accent)),
-            if (has) ...[const SizedBox(width: 6), Text(tray.trayType,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.textPrimary))],
-          ]),
-          if (tray.traySubBrands.isNotEmpty)
-            Text(tray.traySubBrands, style: TextStyle(fontSize: 11, color: c.textSecondary), overflow: TextOverflow.ellipsis),
-        ])),
-        if (tray.nozzleTempMax > 0)
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: Text('${tray.nozzleTempMin}-${tray.nozzleTempMax}°C', style: TextStyle(fontSize: 11, color: c.textSecondary)),
+        padding: const EdgeInsets.all(10),
+        child: Row(children: [
+          Container(width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: has ? (clr ?? widget.c.textSecondary) : widget.c.background,
+              shape: BoxShape.circle,
+              border: Border.all(color: widget.c.textSecondary.withValues(alpha: 0.2), width: 2),
+              boxShadow: has ? [BoxShadow(color: (clr ?? widget.c.textSecondary).withValues(alpha: 0.4), blurRadius: 4)] : [],
+            ),
           ),
-        const SizedBox(width: 4),
-        Icon(LucideIcons.pencil, size: 14, color: c.accent.withValues(alpha: 0.5)),
-      ]),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text('#${widget.slot + 1}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: widget.c.accent)),
+              if (has) ...[const SizedBox(width: 6), Text(widget.tray.trayType,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: widget.c.textPrimary))],
+            ]),
+            if (widget.tray.traySubBrands.isNotEmpty)
+              Text(widget.tray.traySubBrands, style: TextStyle(fontSize: 11, color: widget.c.textSecondary), overflow: TextOverflow.ellipsis),
+          ])),
+          if (widget.tray.nozzleTempMax > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Text('${widget.tray.nozzleTempMin}-${widget.tray.nozzleTempMax}°C', style: TextStyle(fontSize: 11, color: widget.c.textSecondary)),
+            ),
+          const SizedBox(width: 4),
+          Icon(LucideIcons.pencil, size: 14, color: widget.c.accent.withValues(alpha: 0.5)),
+        ]),
+      ),
     );
   }
 
@@ -171,6 +198,44 @@ class _TrayCard extends StatelessWidget {
             backgroundColor: const Color(0xFF6FCF97), duration: const Duration(seconds: 2)),
       );
     }
+  }
+}
+
+// ---- 空槽位占位符 ----
+class _EmptySlotCard extends StatelessWidget {
+  const _EmptySlotCard({required this.slot, required this.c});
+  final int slot; final NeuoColors c;
+
+  @override
+  Widget build(BuildContext context) {
+    return FlutterNeumorphism(
+      style: NeumorphismStyle(
+        color: c.background,
+        borderRadius: 10,
+        depth: 3,
+        type: NeumorphismType.flat,
+      ),
+      padding: const EdgeInsets.all(10),
+      child: Row(children: [
+        Container(width: 32, height: 32,
+          decoration: BoxDecoration(
+            color: c.background,
+            shape: BoxShape.circle,
+            border: Border.all(color: c.textSecondary.withValues(alpha: 0.15), width: 2),
+          ),
+          child: Icon(LucideIcons.circleDashed, size: 16, color: c.textSecondary.withValues(alpha: 0.3)),
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text('#${slot + 1}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.accent)),
+            const SizedBox(width: 6),
+            Text('空槽位', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: c.textSecondary)),
+          ]),
+          Text('未识别到耗材', style: TextStyle(fontSize: 11, color: c.textSecondary.withValues(alpha: 0.6))),
+        ])),
+      ]),
+    );
   }
 }
 
@@ -270,8 +335,11 @@ class _NoAms extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          NeuoCard(shape: NeuoShape.convex, borderRadius: 40, depth: 5, intensity: 0.6, padding: const EdgeInsets.all(24),
-              child: Icon(LucideIcons.packageOpen, size: 48, color: c.textSecondary.withValues(alpha: 0.35))),
+          FlutterNeumorphism(
+            style: NeumorphismStyle(color: c.background, borderRadius: 40, depth: 5),
+            padding: const EdgeInsets.all(24),
+            child: Icon(LucideIcons.packageOpen, size: 48, color: c.textSecondary.withValues(alpha: 0.35)),
+          ),
           const SizedBox(height: 18),
           Text('未检测到 AMS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.textPrimary)),
           const SizedBox(height: 4),
@@ -279,5 +347,3 @@ class _NoAms extends StatelessWidget {
         ]),
       );
 }
-
-

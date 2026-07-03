@@ -1,7 +1,8 @@
-/// 设置 Tab（拟物卡片风格）
+/// 设置 Tab（使用 flutter_neumorphism_ui）
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_neumorphism_ui/flutter_neumorphism_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +13,6 @@ import 'package:bambu_lab_app/providers/theme_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 import 'package:bambu_lab_app/utils/printer_image.dart';
 import 'package:bambu_lab_app/utils/debug_log_viewer.dart';
-import 'package:bambu_lab_app/widgets/neuo_card.dart';
 
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key});
@@ -23,36 +23,26 @@ class SettingsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(14),
       children: [
-        // ---- 打印机 ----
         _sec('打印机', c),
         const SizedBox(height: 8),
         const _InfoCard(),
-
         const SizedBox(height: 14),
-
-        // ---- 应用 ----
         _sec('应用', c),
         const SizedBox(height: 8),
-        _cardTile(LucideIcons.info, '关于', 'Bambu Lab App v$appVersion', c, () => showAboutDialog(
+        _TileBtn(icon: LucideIcons.info, title: '关于', subtitle: 'Bambu Lab App v$appVersion', c: c, onTap: () => showAboutDialog(
             context: context, applicationName: 'Bambu Lab App', applicationVersion: appVersion, applicationLegalese: 'Powered by Flutter')),
         const SizedBox(height: 6),
-        _cardTile(LucideIcons.bug, '调试信息', '查看连接和状态详情', c, () => _debug(context, c)),
-
+        _TileBtn(icon: LucideIcons.bug, title: '调试信息', subtitle: '查看连接和状态详情', c: c, onTap: () => showDebugLog(context)),
         const SizedBox(height: 14),
-
-        // ---- 外观 ----
         _sec('外观', c),
         const SizedBox(height: 8),
         const _ThemeSelector(),
-
         const SizedBox(height: 14),
-
-        // ---- 操作 ----
         _sec('操作', c),
         const SizedBox(height: 8),
-        _cardTile(LucideIcons.pencil, '管理打印机', '添加、编辑或删除打印机配置', c, () => context.go('/')),
+        _TileBtn(icon: LucideIcons.pencil, title: '管理打印机', subtitle: '添加、编辑或删除打印机配置', c: c, onTap: () => context.go('/')),
         const SizedBox(height: 6),
-        _cardTile(LucideIcons.logOut, '断开连接', '断开后自动返回打印机管理页面', c, () async {
+        _TileBtn(icon: LucideIcons.logOut, title: '断开连接', subtitle: '断开后自动返回打印机管理页面', c: c, onTap: () async {
           final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
             title: const Text('断开连接'), content: const Text('确定要断开与打印机的连接吗？'),
             actions: [
@@ -73,21 +63,6 @@ class SettingsTab extends StatelessWidget {
   Widget _sec(String t, NeuoColors c) => Align(
       alignment: Alignment.centerLeft,
       child: Text(t, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.textPrimary)));
-
-  Widget _cardTile(IconData icon, String title, String subtitle, NeuoColors c, VoidCallback onTap) => NeuoCard(
-        onTap: onTap, borderRadius: 14, depth: 4, intensity: 0.55,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(children: [
-          NeuoCard(shape: NeuoShape.concave, borderRadius: 10, depth: 2, intensity: 0.35, padding: const EdgeInsets.all(8),
-              child: Icon(icon, size: 18, color: c.accent)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.textPrimary)),
-            Text(subtitle, style: TextStyle(fontSize: 12, color: c.textSecondary)),
-          ])),
-          Icon(LucideIcons.chevronRight, size: 18, color: c.textSecondary.withValues(alpha: 0.5)),
-        ]),
-      );
 }
 
 // ---- 打印机信息卡片 ----
@@ -103,11 +78,10 @@ class _InfoCard extends StatelessWidget {
         final s = printer.state;
         final img = printerImageByType(s.printerType);
 
-        return NeuoCard(
-          borderRadius: 16, depth: 5, intensity: 0.65,
+        return FlutterNeumorphism(
+          style: NeumorphismStyle(color: c.background, borderRadius: 16, depth: 5),
           padding: const EdgeInsets.all(14),
           child: Row(children: [
-            // 型号图
             if (img != null)
               Padding(
                 padding: const EdgeInsets.only(right: 12),
@@ -149,6 +123,63 @@ class _InfoCard extends StatelessWidget {
   }
 }
 
+// ---- 可点击卡片按钮 ----
+class _TileBtn extends StatefulWidget {
+  const _TileBtn({required this.icon, required this.title, required this.subtitle, required this.c, required this.onTap});
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final NeuoColors c;
+  final VoidCallback onTap;
+
+  @override
+  State<_TileBtn> createState() => _TileBtnState();
+}
+
+class _TileBtnState extends State<_TileBtn> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.c.background,
+          borderRadius: 14,
+          depth: _pressed ? 3 : 5,
+          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: widget.c.accent.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(widget.icon, size: 18, color: widget.c.accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(widget.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: widget.c.textPrimary)),
+              Text(widget.subtitle, style: TextStyle(fontSize: 12, color: widget.c.textSecondary)),
+            ]),
+          ),
+          Icon(LucideIcons.chevronRight, size: 18, color: widget.c.textSecondary.withValues(alpha: 0.5)),
+        ]),
+      ),
+    );
+  }
+}
+
 // ---- 主题选择 ----
 class _ThemeSelector extends StatelessWidget {
   const _ThemeSelector();
@@ -168,27 +199,56 @@ class _ThemeSelector extends StatelessWidget {
         Expanded(
           child: Padding(
             padding: EdgeInsets.only(left: opt.$1 == ThemeMode.system ? 0 : 4, right: opt.$1 == ThemeMode.dark ? 0 : 4),
-            child: NeuoCard(
-              onTap: () => tp.mode = opt.$1,
-              shape: cur == opt.$1 ? NeuoShape.concave : NeuoShape.convex,
-              borderRadius: 12, depth: cur == opt.$1 ? 2 : 4, intensity: 0.55,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(children: [
-                Icon(opt.$2, size: 22,
-                    color: cur == opt.$1 ? c.accent : c.textSecondary.withValues(alpha: 0.5)),
-                const SizedBox(height: 4),
-                Text(opt.$3, style: TextStyle(fontSize: 11,
-                    fontWeight: cur == opt.$1 ? FontWeight.w600 : FontWeight.w400,
-                    color: cur == opt.$1 ? c.accent : c.textSecondary)),
-              ]),
-            ),
+            child: _ThemeBtn(mode: opt.$1, icon: opt.$2, label: opt.$3, selected: cur == opt.$1, onTap: () => tp.mode = opt.$1, c: c),
           ),
         ),
     ]);
   }
 }
 
-// ---- 调试弹窗 ----
-void _debug(BuildContext context, NeuoColors c) {
-  showDebugLog(context);
+// ---- 主题按钮 ----
+class _ThemeBtn extends StatefulWidget {
+  const _ThemeBtn({required this.mode, required this.icon, required this.label, required this.selected, required this.onTap, required this.c});
+  final ThemeMode mode;
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final NeuoColors c;
+
+  @override
+  State<_ThemeBtn> createState() => _ThemeBtnState();
+}
+
+class _ThemeBtnState extends State<_ThemeBtn> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.c.background,
+          borderRadius: 12,
+          depth: _pressed ? 2 : (widget.selected ? 3 : 5),
+          type: _pressed ? NeumorphismType.pressed : (widget.selected ? NeumorphismType.pressed : NeumorphismType.flat),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(children: [
+          Icon(widget.icon, size: 22,
+              color: widget.selected ? widget.c.accent : widget.c.textSecondary.withValues(alpha: 0.5)),
+          const SizedBox(height: 4),
+          Text(widget.label, style: TextStyle(fontSize: 11,
+              fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w400,
+              color: widget.selected ? widget.c.accent : widget.c.textSecondary)),
+        ]),
+      ),
+    );
+  }
 }

@@ -19,8 +19,10 @@ class AMS {
       for (final t in map['tray'] as List) {
         if (t is Map<String, dynamic>) {
           final id = t['id'];
-          if (id != null) {  // 只需要 id 存在，不需要 n 字段
+          if (id != null) {
             final trayId = int.tryParse(id.toString()) ?? 0;
+            // 创建所有槽位的tray对象(包括数据不完整的)
+            // UI会根据数据完整性显示不同的样式
             trays[trayId] = FilamentTray.fromMap(t);
           }
         }

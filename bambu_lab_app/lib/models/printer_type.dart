@@ -55,10 +55,15 @@ enum PrinterType {
         _ => false,
       };
 
-  /// 是否有摄像头 (A2L 有低速率摄像头，非 RTSP)
+  /// 是否有摄像头
+  /// A1/A1 Mini/A2L: JPEG 帧拉取 (端口 6000)
+  /// P1S/P1P/X1 系列: RTSP 流
   bool get hasCamera => switch (this) {
-        PrinterType.p1s ||
+        PrinterType.a1Mini ||
+        PrinterType.a1 ||
         PrinterType.a2l ||
+        PrinterType.p1s ||
+        PrinterType.p1p ||
         PrinterType.x1 ||
         PrinterType.x1c ||
         PrinterType.x1e =>

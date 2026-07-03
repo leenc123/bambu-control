@@ -572,16 +572,323 @@ class PrintersCompanion extends UpdateCompanion<Printer> {
   }
 }
 
+class $DebugLogEntriesTable extends DebugLogEntries
+    with TableInfo<$DebugLogEntriesTable, DebugLogEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DebugLogEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _timeMeta = const VerificationMeta('time');
+  @override
+  late final GeneratedColumn<DateTime> time = GeneratedColumn<DateTime>(
+    'time',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tagMeta = const VerificationMeta('tag');
+  @override
+  late final GeneratedColumn<String> tag = GeneratedColumn<String>(
+    'tag',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 32,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _messageMeta = const VerificationMeta(
+    'message',
+  );
+  @override
+  late final GeneratedColumn<String> message = GeneratedColumn<String>(
+    'message',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, time, tag, message];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'debug_log_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DebugLogEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('time')) {
+      context.handle(
+        _timeMeta,
+        time.isAcceptableOrUnknown(data['time']!, _timeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_timeMeta);
+    }
+    if (data.containsKey('tag')) {
+      context.handle(
+        _tagMeta,
+        tag.isAcceptableOrUnknown(data['tag']!, _tagMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tagMeta);
+    }
+    if (data.containsKey('message')) {
+      context.handle(
+        _messageMeta,
+        message.isAcceptableOrUnknown(data['message']!, _messageMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DebugLogEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DebugLogEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      time: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}time'],
+      )!,
+      tag: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tag'],
+      )!,
+      message: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message'],
+      )!,
+    );
+  }
+
+  @override
+  $DebugLogEntriesTable createAlias(String alias) {
+    return $DebugLogEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class DebugLogEntry extends DataClass implements Insertable<DebugLogEntry> {
+  final int id;
+  final DateTime time;
+  final String tag;
+  final String message;
+  const DebugLogEntry({
+    required this.id,
+    required this.time,
+    required this.tag,
+    required this.message,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['time'] = Variable<DateTime>(time);
+    map['tag'] = Variable<String>(tag);
+    map['message'] = Variable<String>(message);
+    return map;
+  }
+
+  DebugLogEntriesCompanion toCompanion(bool nullToAbsent) {
+    return DebugLogEntriesCompanion(
+      id: Value(id),
+      time: Value(time),
+      tag: Value(tag),
+      message: Value(message),
+    );
+  }
+
+  factory DebugLogEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DebugLogEntry(
+      id: serializer.fromJson<int>(json['id']),
+      time: serializer.fromJson<DateTime>(json['time']),
+      tag: serializer.fromJson<String>(json['tag']),
+      message: serializer.fromJson<String>(json['message']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'time': serializer.toJson<DateTime>(time),
+      'tag': serializer.toJson<String>(tag),
+      'message': serializer.toJson<String>(message),
+    };
+  }
+
+  DebugLogEntry copyWith({
+    int? id,
+    DateTime? time,
+    String? tag,
+    String? message,
+  }) => DebugLogEntry(
+    id: id ?? this.id,
+    time: time ?? this.time,
+    tag: tag ?? this.tag,
+    message: message ?? this.message,
+  );
+  DebugLogEntry copyWithCompanion(DebugLogEntriesCompanion data) {
+    return DebugLogEntry(
+      id: data.id.present ? data.id.value : this.id,
+      time: data.time.present ? data.time.value : this.time,
+      tag: data.tag.present ? data.tag.value : this.tag,
+      message: data.message.present ? data.message.value : this.message,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DebugLogEntry(')
+          ..write('id: $id, ')
+          ..write('time: $time, ')
+          ..write('tag: $tag, ')
+          ..write('message: $message')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, time, tag, message);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DebugLogEntry &&
+          other.id == this.id &&
+          other.time == this.time &&
+          other.tag == this.tag &&
+          other.message == this.message);
+}
+
+class DebugLogEntriesCompanion extends UpdateCompanion<DebugLogEntry> {
+  final Value<int> id;
+  final Value<DateTime> time;
+  final Value<String> tag;
+  final Value<String> message;
+  const DebugLogEntriesCompanion({
+    this.id = const Value.absent(),
+    this.time = const Value.absent(),
+    this.tag = const Value.absent(),
+    this.message = const Value.absent(),
+  });
+  DebugLogEntriesCompanion.insert({
+    this.id = const Value.absent(),
+    required DateTime time,
+    required String tag,
+    required String message,
+  }) : time = Value(time),
+       tag = Value(tag),
+       message = Value(message);
+  static Insertable<DebugLogEntry> custom({
+    Expression<int>? id,
+    Expression<DateTime>? time,
+    Expression<String>? tag,
+    Expression<String>? message,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (time != null) 'time': time,
+      if (tag != null) 'tag': tag,
+      if (message != null) 'message': message,
+    });
+  }
+
+  DebugLogEntriesCompanion copyWith({
+    Value<int>? id,
+    Value<DateTime>? time,
+    Value<String>? tag,
+    Value<String>? message,
+  }) {
+    return DebugLogEntriesCompanion(
+      id: id ?? this.id,
+      time: time ?? this.time,
+      tag: tag ?? this.tag,
+      message: message ?? this.message,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (time.present) {
+      map['time'] = Variable<DateTime>(time.value);
+    }
+    if (tag.present) {
+      map['tag'] = Variable<String>(tag.value);
+    }
+    if (message.present) {
+      map['message'] = Variable<String>(message.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DebugLogEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('time: $time, ')
+          ..write('tag: $tag, ')
+          ..write('message: $message')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $PrintersTable printers = $PrintersTable(this);
+  late final $DebugLogEntriesTable debugLogEntries = $DebugLogEntriesTable(
+    this,
+  );
   late final PrinterDao printerDao = PrinterDao(this as AppDatabase);
+  late final DebugLogDao debugLogDao = DebugLogDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [printers];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    printers,
+    debugLogEntries,
+  ];
 }
 
 typedef $$PrintersTableCreateCompanionBuilder =
@@ -854,10 +1161,189 @@ typedef $$PrintersTableProcessedTableManager =
       Printer,
       PrefetchHooks Function()
     >;
+typedef $$DebugLogEntriesTableCreateCompanionBuilder =
+    DebugLogEntriesCompanion Function({
+      Value<int> id,
+      required DateTime time,
+      required String tag,
+      required String message,
+    });
+typedef $$DebugLogEntriesTableUpdateCompanionBuilder =
+    DebugLogEntriesCompanion Function({
+      Value<int> id,
+      Value<DateTime> time,
+      Value<String> tag,
+      Value<String> message,
+    });
+
+class $$DebugLogEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $DebugLogEntriesTable> {
+  $$DebugLogEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get time => $composableBuilder(
+    column: $table.time,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tag => $composableBuilder(
+    column: $table.tag,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get message => $composableBuilder(
+    column: $table.message,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DebugLogEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $DebugLogEntriesTable> {
+  $$DebugLogEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get time => $composableBuilder(
+    column: $table.time,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tag => $composableBuilder(
+    column: $table.tag,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get message => $composableBuilder(
+    column: $table.message,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DebugLogEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DebugLogEntriesTable> {
+  $$DebugLogEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get time =>
+      $composableBuilder(column: $table.time, builder: (column) => column);
+
+  GeneratedColumn<String> get tag =>
+      $composableBuilder(column: $table.tag, builder: (column) => column);
+
+  GeneratedColumn<String> get message =>
+      $composableBuilder(column: $table.message, builder: (column) => column);
+}
+
+class $$DebugLogEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DebugLogEntriesTable,
+          DebugLogEntry,
+          $$DebugLogEntriesTableFilterComposer,
+          $$DebugLogEntriesTableOrderingComposer,
+          $$DebugLogEntriesTableAnnotationComposer,
+          $$DebugLogEntriesTableCreateCompanionBuilder,
+          $$DebugLogEntriesTableUpdateCompanionBuilder,
+          (
+            DebugLogEntry,
+            BaseReferences<_$AppDatabase, $DebugLogEntriesTable, DebugLogEntry>,
+          ),
+          DebugLogEntry,
+          PrefetchHooks Function()
+        > {
+  $$DebugLogEntriesTableTableManager(
+    _$AppDatabase db,
+    $DebugLogEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DebugLogEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DebugLogEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DebugLogEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<DateTime> time = const Value.absent(),
+                Value<String> tag = const Value.absent(),
+                Value<String> message = const Value.absent(),
+              }) => DebugLogEntriesCompanion(
+                id: id,
+                time: time,
+                tag: tag,
+                message: message,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required DateTime time,
+                required String tag,
+                required String message,
+              }) => DebugLogEntriesCompanion.insert(
+                id: id,
+                time: time,
+                tag: tag,
+                message: message,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DebugLogEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DebugLogEntriesTable,
+      DebugLogEntry,
+      $$DebugLogEntriesTableFilterComposer,
+      $$DebugLogEntriesTableOrderingComposer,
+      $$DebugLogEntriesTableAnnotationComposer,
+      $$DebugLogEntriesTableCreateCompanionBuilder,
+      $$DebugLogEntriesTableUpdateCompanionBuilder,
+      (
+        DebugLogEntry,
+        BaseReferences<_$AppDatabase, $DebugLogEntriesTable, DebugLogEntry>,
+      ),
+      DebugLogEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$PrintersTableTableManager get printers =>
       $$PrintersTableTableManager(_db, _db.printers);
+  $$DebugLogEntriesTableTableManager get debugLogEntries =>
+      $$DebugLogEntriesTableTableManager(_db, _db.debugLogEntries);
 }

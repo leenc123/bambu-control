@@ -10,6 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Lottie animation
+  lottie: ^3.1.0
   cupertino_icons: ^1.0.8
   # State management
   provider: ^6.1.2
@@ -25,7 +27,10 @@ dependencies:
   # UI
   google_fonts: ^6.2.1
   lucide_icons_flutter: ^3.1.14
+  flutter_neumorphism_ui: ^1.0.2
   ftpconnect: ^2.0.10
+  # File sharing
+  share_plus: ^10.1.4
   best_flutter_ui_templates:
     path: ../Best-Flutter-UI-Templates/best_flutter_ui_templates
 
@@ -41,6 +46,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/printer_images/
+    - assets/bambu control.json
     - bamboo_app_logo.png
 
 flutter_launcher_icons:

@@ -9,14 +9,16 @@ import 'package:bambu_lab_app/providers/theme_provider.dart';
 import 'package:bambu_lab_app/screens/connect/connect_screen.dart';
 import 'package:bambu_lab_app/screens/dashboard/dashboard_screen.dart';
 import 'package:bambu_lab_app/screens/home/home_screen.dart';
+import 'package:bambu_lab_app/screens/splash/splash_screen.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 
 class BambuLabApp extends StatelessWidget {
   const BambuLabApp({super.key});
 
   static final _router = GoRouter(
-    initialLocation: '/',
+    initialLocation: '/splash',
     routes: [
+      GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
       GoRoute(path: '/connect', builder: (_, __) => const ConnectScreen()),
       GoRoute(path: '/connect/:id',

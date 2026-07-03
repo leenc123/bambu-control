@@ -12,6 +12,7 @@ import 'package:bambu_lab_app/models/printer_state.dart';
 import 'package:bambu_lab_app/models/print_status.dart';
 import 'package:bambu_lab_app/models/printer_type.dart';
 import 'package:bambu_lab_app/services/mqtt_client.dart';
+import 'package:bambu_lab_app/utils/debug_log.dart';
 
 /// 打印机服务 - 整合 MQTT 通信和状态管理
 class PrinterService {
@@ -35,6 +36,9 @@ class PrinterService {
 
   final BambuMqttClient _mqtt;
 
+  /// MQTT 消息监听器（需在断开时取消）
+  StreamSubscription<Map<String, dynamic>>? _mqttSubscription;
+
   /// 当前打印机状态
   PrinterState _state = const PrinterState();
 
@@ -55,10 +59,16 @@ class PrinterService {
 
   /// 连接到打印机
   Future<bool> connect() async {
-    _mqtt.messageStream.listen(_handleMessage);
+    // 取消旧监听器，避免重复订阅
+    await _mqttSubscription?.cancel();
+    DebugLog.i('SVC', '正在连接打印机...');
+    _mqttSubscription = _mqtt.messageStream.listen(_handleMessage);
     final ok = await _mqtt.connect();
     if (ok) {
+      DebugLog.i('SVC', '连接成功');
       _updateState(_state.copyWith(online: true));
+    } else {
+      DebugLog.i('SVC', '连接失败: ${_mqtt.lastError ?? "未知"}');
     }
     return ok;
   }
@@ -68,12 +78,16 @@ class PrinterService {
 
   /// 断开连接
   void disconnect() {
+    _mqttSubscription?.cancel();
+    _mqttSubscription = null;
     _mqtt.disconnect();
     _updateState(_state.copyWith(online: false));
   }
 
   /// 释放资源
   void dispose() {
+    _mqttSubscription?.cancel();
+    _mqttSubscription = null;
     _mqtt.dispose();
     _stateController.close();
   }
@@ -81,25 +95,19 @@ class PrinterService {
   // --- 消息处理 ---
 
   void _handleMessage(Map<String, dynamic> msg) {
-    _state = PrinterState.fromMqttReport(msg, previous: _state);
-    _updateAmsHub(msg);
-    _stateController.add(_state);
+    final newState = PrinterState.fromMqttReport(msg, previous: _state);
+    // AMS 数据已经在 fromMqttReport 中解析(print.ams),不需要再次处理
+    _updateState(newState);
+    DebugLog.i('SVC', '状态更新: ${_state.printStatus.displayName} '
+        'bed=${_state.bedTemp} nozzle=${_state.nozzleTemp} '
+        'progress=${_state.printPercentage}%');
     // ignore: avoid_print
     print('[PrinterService] 状态更新: gcode=${_state.gcodeState.displayName}, '
         'status=${_state.printStatus.displayName}, '
         'bed=${_state.bedTemp}, nozzle=${_state.nozzleTemp}, '
-        'progress=${_state.printPercentage}%');
-  }
-
-  void _updateAmsHub(Map<String, dynamic> msg) {
-    final amsData = msg['ams'];
-    if (amsData is Map<String, dynamic>) {
-      final amsList = amsData['ams'];
-      if (amsList is List) {
-        final hub = AMSHub.fromList(amsList);
-        _state = _state.copyWith(amsHub: hub);
-      }
-    }
+        'progress=${_state.printPercentage}%, '
+        'printerType=${_state.printerType.displayName}, '
+        'hasAms=${_state.hasAms}');
   }
 
   void _updateState(PrinterState newState) {
@@ -227,6 +235,14 @@ class PrinterService {
   /// 恢复耗材操作
   Future<bool> resumeFilamentAction() async =>
       _mqtt.resumeFilamentAction();
+
+  /// 手动进料（无AMS时使用）
+  Future<bool> manualLoadFilament(int temperature, int extrudeLength) async =>
+      _mqtt.manualLoadFilament(temperature, extrudeLength);
+
+  /// 手动退料（无AMS时使用）
+  Future<bool> manualUnloadFilament(int temperature, int retractLength) async =>
+      _mqtt.manualUnloadFilament(temperature, retractLength);
 
   /// 设置打印机耗材
   Future<bool> setPrinterFilament({

@@ -2,9 +2,14 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 import 'package:bambu_lab_app/utils/debug_log.dart';
+
+String _logsText(List<LogEntry> logs) {
+  return logs.reversed.map((e) => e.formatted).join('\n');
+}
 
 /// 在任何页面调用此函数即可弹出调试日志
 void showDebugLog(BuildContext context) {
@@ -22,9 +27,22 @@ void showDebugLog(BuildContext context) {
         padding: const EdgeInsets.all(20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Text('MQTT 调试日志', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.textPrimary)),
+            Text('调试日志', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.textPrimary)),
             const Spacer(),
             Text('${logs.length} 条', style: TextStyle(fontSize: 12, color: c.textSecondary)),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () async {
+                final text = _logsText(logs);
+                await Clipboard.setData(ClipboardData(text: text));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${logs.length} 条日志已复制'), backgroundColor: c.accent),
+                  );
+                }
+              },
+              child: Text('复制', style: TextStyle(fontSize: 13, color: c.accent)),
+            ),
             const SizedBox(width: 10),
             GestureDetector(
               onTap: () { DebugLog.clear(); },
@@ -34,7 +52,7 @@ void showDebugLog(BuildContext context) {
           const SizedBox(height: 12),
           if (logs.isEmpty)
             Padding(padding: const EdgeInsets.only(top: 40),
-                child: Center(child: Text('暂无日志 — 连接打印机后 MQTT 日志会自动记录', style: TextStyle(fontSize: 13, color: c.textSecondary))))
+                child: Center(child: Text('暂无日志 — 连接打印机后日志会自动记录', style: TextStyle(fontSize: 13, color: c.textSecondary))))
           else
             ...logs.reversed.map((e) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 1),

@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'printer_dao.dart';
+import 'debug_log_dao.dart';
 
 part 'database.g.dart';
 
@@ -26,13 +27,21 @@ class Printers extends Table {
   DateTimeColumn get createdAt => dateTime()();
 }
 
+/// 调试日志表
+class DebugLogEntries extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  DateTimeColumn get time => dateTime()();
+  TextColumn get tag => text().withLength(min: 1, max: 32)();
+  TextColumn get message => text()();
+}
+
 /// 应用数据库
-@DriftDatabase(tables: [Printers], daos: [PrinterDao])
+@DriftDatabase(tables: [Printers, DebugLogEntries], daos: [PrinterDao, DebugLogDao])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -40,7 +49,6 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             // v1 -> v2: 添加 use_tls 列（默认 true = 使用 TLS）
-            // 使用原生 SQL 因为需要 DEFAULT 值
             await m.database.customStatement(
               'ALTER TABLE printers ADD COLUMN use_tls INTEGER NOT NULL DEFAULT 1',
             );
@@ -50,6 +58,10 @@ class AppDatabase extends _$AppDatabase {
             await m.database.customStatement(
               "ALTER TABLE printers ADD COLUMN printer_type TEXT NOT NULL DEFAULT 'UNKNOWN'",
             );
+          }
+          if (from < 4) {
+            // v3 -> v4: 添加调试日志表
+            await m.createTable(debugLogEntries);
           }
         },
       );

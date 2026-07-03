@@ -43,6 +43,12 @@ class BambuMqttClient {
   /// 最新的完整状态数据（合并所有推送）
   final Map<String, dynamic> _data = {};
 
+  /// Watchdog 计时器 - 60秒无数据则重新请求推送
+  Timer? _watchdogTimer;
+
+  /// Watchdog 超时时间（秒）
+  static const int _watchdogTimeoutSeconds = 60;
+
   /// 消息广播流 - 每次收到 MQTT 报告时触发
   Stream<Map<String, dynamic>> get messageStream =>
       _messageController.stream;
@@ -114,12 +120,18 @@ class BambuMqttClient {
     if (client.connectionStatus?.state == MqttConnectionState.connected) {
       _client = client;
 
-      // 先挂上消息监听，再订阅主题，避免漏收
+      // 先挂上消息监听，再订阅主题
       client.updates!.listen(_onMessage);
 
-      // 订阅报告主题并请求全量推送
+      // 订阅报告主题 — MQTT 保证先处理 subscribe 再处理后续 publish，不会漏收
       client.subscribe(reportTopic, MqttQos.atLeastOnce);
+
+      // 订阅后立即请求打印机推送完整状态
+      // ⚠️ 注意：不能在 _onConnected 回调里做这些，因为那时 _client 还是 null
+      startPush();
       pushAll();
+      _startWatchdog();
+
       return true;
     } else {
       _log('连接状态异常: ${client.connectionStatus}');
@@ -130,8 +142,11 @@ class BambuMqttClient {
 
   /// 断开连接
   void disconnect() {
+    _stopWatchdog();
     _client?.disconnect();
     _client = null;
+    // 清理状态缓存，确保重连时重新接收完整数据
+    _data.clear();
   }
 
   /// 释放资源
@@ -140,16 +155,59 @@ class BambuMqttClient {
     _messageController.close();
   }
 
+  // --- Watchdog ---
+
+  /// 启动 watchdog 计时器
+  void _startWatchdog() {
+    _stopWatchdog();
+    _watchdogTimer = Timer(
+      const Duration(seconds: _watchdogTimeoutSeconds),
+      _onWatchdogTimeout,
+    );
+    _log('Watchdog 已启动 ($_watchdogTimeoutSeconds 秒)');
+  }
+
+  /// 重置 watchdog（收到消息时调用）
+  void _resetWatchdog() {
+    _watchdogTimer?.cancel();
+    _watchdogTimer = Timer(
+      const Duration(seconds: _watchdogTimeoutSeconds),
+      _onWatchdogTimeout,
+    );
+  }
+
+  /// 停止 watchdog
+  void _stopWatchdog() {
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+  }
+
+  /// Watchdog 超时回调 - 重新请求推送
+  void _onWatchdogTimeout() {
+    _log('Watchdog 超时，重新请求推送状态');
+    if (!isConnected) {
+      _log('未连接，等待自动重连');
+      _startWatchdog();
+      return;
+    }
+    startPush();
+    pushAll();
+    // 重启计时器
+    _startWatchdog();
+  }
+
   // --- 回调 ---
 
   void _onConnected() {
     _log('已连接到 MQTT 服务器');
-    if (_client != null) {
-      // 自动重连后 _client 已存在，重新订阅并请求推送
+    // 自动重连路径：_client 已存在，重新订阅并请求推送
+    // （首次连接的 startPush/pushAll/watchdog 已在 connect() 中完成）
+    if (_client != null && _client!.connectionStatus?.state == MqttConnectionState.connected) {
       _client!.subscribe(reportTopic, MqttQos.atLeastOnce);
+      startPush();
       pushAll();
+      _startWatchdog();
     }
-    // 首次连接时订阅在 connect() 中 _client 赋值后执行
   }
 
   void _onDisconnected() {
@@ -165,6 +223,9 @@ class BambuMqttClient {
   }
 
   void _onMessage(List<MqttReceivedMessage<MqttMessage>> messages) {
+    // 收到消息时重置 watchdog
+    _resetWatchdog();
+
     for (final msg in messages) {
       final pubMsg = msg.payload as MqttPublishMessage;
       final jsonStr = MqttPublishPayload.bytesToStringAsString(
@@ -219,10 +280,18 @@ class BambuMqttClient {
   }
 
   /// 请求全量状态推送
+  /// 注意：P1 系列需要完整格式，否则可能不响应
   bool pushAll() {
     return publishCommand({
       'pushing': {'command': 'pushall'},
       'info': {'command': 'get_version'},
+    });
+  }
+
+  /// 开始持续推送（用于 watchdog 超时后重新请求）
+  bool startPush() {
+    return publishCommand({
+      'pushing': {'command': 'start'},
     });
   }
 
@@ -433,6 +502,20 @@ class BambuMqttClient {
         'param': 'resume',
       },
     });
+  }
+
+  // --- 手动进退料（无AMS时使用）---
+
+  /// 手动进料（无AMS）
+  /// 先加热喷嘴到指定温度，然后挤出耗材
+  bool manualLoadFilament(int temperature, int extrudeLength) {
+    return sendGcode('M104 S$temperature\nG1 E$extrudeLength F300\n');
+  }
+
+  /// 手动退料（无AMS）
+  /// 先加热喷嘴到指定温度，然后回抽耗材
+  bool manualUnloadFilament(int temperature, int retractLength) {
+    return sendGcode('M104 S$temperature\nG1 E-$retractLength F300\n');
   }
 
   // --- 校准 ---

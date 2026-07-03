@@ -74,13 +74,19 @@ class FilamentTray {
   /// 获取匹配的耗材类型
   Filament? get filament => Filament.fromTrayInfoIdx(trayInfoIdx);
 
-  /// 耗材颜色（十六进制，去掉 alpha 通道前两位）
+  /// 耗材颜色（十六进制，从 RRGGBBAA 转为 AARRGGBB）
   String get displayColor {
     if (trayColor.length == 8) {
-      return '#${trayColor.substring(2)}';
+      // 把 alpha 通道从末尾移到开头: RRGGBBAA → AARRGGBB
+      return '#${trayColor.substring(6)}${trayColor.substring(0, 6)}';
     }
     return '#$trayColor';
   }
+
+  /// 判断是否为有效槽位（有耗材数据）
+  bool get isValid =>
+      (trayType.isNotEmpty || trayColor.isNotEmpty) &&
+      trayInfoIdx.isNotEmpty;
 
   static double _toDouble(dynamic value) {
     if (value is double) return value;

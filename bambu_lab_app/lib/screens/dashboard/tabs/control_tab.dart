@@ -1,13 +1,14 @@
-/// 高级控制 Tab（使用自定义拟物组件）
+/// 高级控制 Tab（使用 flutter_neumorphism_ui）
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_neumorphism_ui/flutter_neumorphism_ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 
+import 'package:bambu_lab_app/providers/ams_provider.dart';
 import 'package:bambu_lab_app/providers/printer_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
-import 'package:bambu_lab_app/widgets/neuo_card.dart';
-import 'package:bambu_lab_app/widgets/neuo_button.dart';
 
 class ControlTab extends StatelessWidget {
   const ControlTab({super.key, required this.printer});
@@ -16,6 +17,8 @@ class ControlTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = NeuoTheme.of(context);
+    final hasAms = context.watch<AmsProvider>().hasAms;
+
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -27,19 +30,26 @@ class ControlTab extends StatelessWidget {
         const SizedBox(height: 8),
         _TempInputs(printer: printer, c: c),
         const SizedBox(height: 14),
-        Row(children: [
+        SizedBox(
+        height: 220,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             _section('操作', c),
             const SizedBox(height: 8),
-            _Actions(printer: printer, c: c),
+            Expanded(child: _Actions(printer: printer, c: c)),
           ])),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             _section('校准', c),
             const SizedBox(height: 8),
-            _CalibrationPanel(printer: printer, c: c),
+            Expanded(child: _CalibrationPanel(printer: printer, c: c)),
           ])),
         ]),
+      ),
+        const SizedBox(height: 14),
+        _section('进退料', c),
+        const SizedBox(height: 8),
+        _FilamentPanel(printer: printer, hasAms: hasAms, c: c),
         const SizedBox(height: 14),
         _section('G-code 终端', c),
         const SizedBox(height: 8),
@@ -76,18 +86,65 @@ class _SpeedPicker extends StatelessWidget {
         final sel = cur == l.$2;
         return Expanded(child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 3),
-          child: NeuoButton(
-            icon: Icon(l.$3, size: 18),
-            label: Text(l.$1, style: TextStyle(fontSize: 12)),
-            borderRadius: 10,
-            depth: sel ? 3 : 5,
-            intensity: sel ? 0.6 : 0.8,
-            backgroundColor: sel ? c.accent.withValues(alpha: 0.15) : null,
-            accentColor: sel ? c.accent : null,
+          child: _PressableButton(
+            icon: l.$3,
+            label: l.$1,
+            selected: sel,
             onPressed: () => printer.setPrintSpeed(l.$2),
+            c: c,
           ),
         ));
       }).toList()),
+    );
+  }
+}
+
+// ---- 可按压按钮 ----
+class _PressableButton extends StatefulWidget {
+  const _PressableButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+    required this.c,
+  });
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+  final NeuoColors c;
+
+  @override
+  State<_PressableButton> createState() => _PressableButtonState();
+}
+
+class _PressableButtonState extends State<_PressableButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final sel = widget.selected;
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: sel ? widget.c.accent.withValues(alpha: 0.15) : widget.c.background,
+          borderRadius: 10,
+          depth: _pressed ? 2 : (sel ? 3 : 5),
+          type: _pressed ? NeumorphismType.pressed : (sel ? NeumorphismType.pressed : NeumorphismType.flat),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(widget.icon, size: 18, color: sel ? widget.c.accent : widget.c.textSecondary),
+          const SizedBox(height: 4),
+          Text(widget.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: sel ? widget.c.accent : widget.c.textSecondary)),
+        ]),
+      ),
     );
   }
 }
@@ -123,10 +180,12 @@ class _TempInputsState extends State<_TempInputs> {
   @override
   Widget build(BuildContext context) {
     final c = widget.c;
-    return NeuoCard(
-      borderRadius: 14,
-      depth: 4,
-      intensity: 0.6,
+    return FlutterNeumorphism(
+      style: NeumorphismStyle(
+        color: c.background,
+        borderRadius: 14,
+        depth: 6,
+      ),
       padding: const EdgeInsets.all(14),
       child: Column(children: [
         _tempRow('热床温度', LucideIcons.grid3x3, _bedCtrl, '60', c, () => _setTemp(_bedCtrl, widget.printer.setBedTemperature)),
@@ -164,14 +223,44 @@ class _TempInputsState extends State<_TempInputs> {
       const SizedBox(width: 4),
       Text('°C', style: TextStyle(fontSize: 12, color: c.textSecondary)),
       const SizedBox(width: 4),
-      NeuoButton.icon(
-        icon: Icon(LucideIcons.circleCheck, size: 18),
-        borderRadius: 10,
-        padding: const EdgeInsets.all(8),
-        accentColor: c.accent,
-        onPressed: onSet,
-      ),
+      _ConfirmButton(onPressed: onSet, c: c),
     ]);
+  }
+}
+
+// ---- 确认按钮 ----
+class _ConfirmButton extends StatefulWidget {
+  const _ConfirmButton({required this.onPressed, required this.c});
+  final VoidCallback onPressed;
+  final NeuoColors c;
+
+  @override
+  State<_ConfirmButton> createState() => _ConfirmButtonState();
+}
+
+class _ConfirmButtonState extends State<_ConfirmButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.c.background,
+          borderRadius: 10,
+          depth: _pressed ? 2 : 5,
+          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+        ),
+        padding: const EdgeInsets.all(8),
+        child: Icon(LucideIcons.circleCheck, size: 18, color: widget.c.accent),
+      ),
+    );
   }
 }
 
@@ -182,58 +271,31 @@ class _Actions extends StatelessWidget {
   final NeuoColors c;
 
   @override
-  Widget build(BuildContext context) => NeuoCard(
-    borderRadius: 14,
-    depth: 4,
-    intensity: 0.6,
+  Widget build(BuildContext context) => FlutterNeumorphism(
+    style: NeumorphismStyle(
+      color: c.background,
+      borderRadius: 14,
+      depth: 6,
+    ),
     padding: const EdgeInsets.all(12),
     child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
       // XY 方向面板
       Column(mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
           const SizedBox(width: 38),
-          NeuoButton.icon(
-            icon: Icon(LucideIcons.chevronUp, size: 20),
-            borderRadius: 12,
-            padding: const EdgeInsets.all(10),
-            onPressed: () => printer.sendGcode('G91\nG1 Y-10 F3000\nG90'),
-          ),
+          _DirButton(icon: LucideIcons.chevronUp, onPressed: () => printer.sendGcode('G91\nG1 Y-10 F3000\nG90'), c: c),
           const SizedBox(width: 38),
         ]),
         const SizedBox(height: 4),
         Row(children: [
-          NeuoButton.icon(
-            icon: Icon(LucideIcons.chevronLeft, size: 20),
-            borderRadius: 12,
-            padding: const EdgeInsets.all(10),
-            onPressed: () => printer.sendGcode('G91\nG1 X-10 F3000\nG90'),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: NeuoButton.fab(
-              icon: Icon(LucideIcons.home, size: 20),
-              borderRadius: 12,
-              padding: const EdgeInsets.all(10),
-              accentColor: c.accent,
-              onPressed: () => printer.autoHome(),
-            ),
-          ),
-          NeuoButton.icon(
-            icon: Icon(LucideIcons.chevronRight, size: 20),
-            borderRadius: 12,
-            padding: const EdgeInsets.all(10),
-            onPressed: () => printer.sendGcode('G91\nG1 X10 F3000\nG90'),
-          ),
+          _DirButton(icon: LucideIcons.chevronLeft, onPressed: () => printer.sendGcode('G91\nG1 X-10 F3000\nG90'), c: c),
+          _HomeButton(onPressed: () => printer.autoHome(), c: c),
+          _DirButton(icon: LucideIcons.chevronRight, onPressed: () => printer.sendGcode('G91\nG1 X10 F3000\nG90'), c: c),
         ]),
         const SizedBox(height: 4),
         Row(children: [
           const SizedBox(width: 38),
-          NeuoButton.icon(
-            icon: Icon(LucideIcons.chevronDown, size: 20),
-            borderRadius: 12,
-            padding: const EdgeInsets.all(10),
-            onPressed: () => printer.sendGcode('G91\nG1 Y10 F3000\nG90'),
-          ),
+          _DirButton(icon: LucideIcons.chevronDown, onPressed: () => printer.sendGcode('G91\nG1 Y10 F3000\nG90'), c: c),
           const SizedBox(width: 38),
         ]),
       ]),
@@ -242,28 +304,130 @@ class _Actions extends StatelessWidget {
       Column(mainAxisSize: MainAxisSize.min, children: [
         Text('Z轴', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c.textSecondary)),
         const SizedBox(height: 6),
-        NeuoButton(
-          icon: Icon(LucideIcons.chevronUp, size: 18),
-          label: Text('升高', style: TextStyle(fontSize: 12)),
-          borderRadius: 10,
-          depth: 4,
-          intensity: 0.7,
-          accentColor: c.accent,
-          onPressed: () => printer.sendGcode('G91\nG1 Z5 F300\nG90'),
-        ),
+        _ZButton(label: '升高', icon: LucideIcons.chevronUp, onPressed: () => printer.sendGcode('G91\nG1 Z5 F300\nG90'), c: c),
         const SizedBox(height: 6),
-        NeuoButton(
-          icon: Icon(LucideIcons.chevronDown, size: 18),
-          label: Text('降低', style: TextStyle(fontSize: 12)),
-          borderRadius: 10,
-          depth: 4,
-          intensity: 0.7,
-          accentColor: c.accent,
-          onPressed: () => printer.sendGcode('G91\nG1 Z-5 F300\nG90'),
-        ),
+        _ZButton(label: '降低', icon: LucideIcons.chevronDown, onPressed: () => printer.sendGcode('G91\nG1 Z-5 F300\nG90'), c: c),
       ]),
     ]),
   );
+}
+
+// ---- 方向按钮 ----
+class _DirButton extends StatefulWidget {
+  const _DirButton({required this.icon, required this.onPressed, required this.c});
+  final IconData icon;
+  final VoidCallback onPressed;
+  final NeuoColors c;
+
+  @override
+  State<_DirButton> createState() => _DirButtonState();
+}
+
+class _DirButtonState extends State<_DirButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.c.background,
+          borderRadius: 12,
+          depth: _pressed ? 2 : 5,
+          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+        ),
+        padding: const EdgeInsets.all(10),
+        child: Icon(widget.icon, size: 20, color: widget.c.textPrimary),
+      ),
+    );
+  }
+}
+
+// ---- 归零按钮 ----
+class _HomeButton extends StatefulWidget {
+  const _HomeButton({required this.onPressed, required this.c});
+  final VoidCallback onPressed;
+  final NeuoColors c;
+
+  @override
+  State<_HomeButton> createState() => _HomeButtonState();
+}
+
+class _HomeButtonState extends State<_HomeButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        child: FlutterNeumorphism(
+          style: NeumorphismStyle(
+            color: widget.c.accent.withValues(alpha: 0.12),
+            borderRadius: 12,
+            depth: _pressed ? 2 : 5,
+            type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Icon(LucideIcons.home, size: 20, color: widget.c.accent),
+        ),
+      ),
+    );
+  }
+}
+
+// ---- Z轴按钮 ----
+class _ZButton extends StatefulWidget {
+  const _ZButton({required this.label, required this.icon, required this.onPressed, required this.c});
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final NeuoColors c;
+
+  @override
+  State<_ZButton> createState() => _ZButtonState();
+}
+
+class _ZButtonState extends State<_ZButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.c.background,
+          borderRadius: 10,
+          depth: _pressed ? 2 : 5,
+          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(widget.icon, size: 18, color: widget.c.accent),
+          const SizedBox(width: 6),
+          Text(widget.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: widget.c.accent)),
+        ]),
+      ),
+    );
+  }
 }
 
 // ---- G-code ----
@@ -296,10 +460,12 @@ class _GcodeTerminalState extends State<_GcodeTerminal> {
   @override
   Widget build(BuildContext context) {
     final c = widget.c;
-    return NeuoCard(
-      borderRadius: 14,
-      depth: 4,
-      intensity: 0.6,
+    return FlutterNeumorphism(
+      style: NeumorphismStyle(
+        color: c.background,
+        borderRadius: 14,
+        depth: 6,
+      ),
       padding: const EdgeInsets.all(12),
       child: Column(children: [
         if (_history.isNotEmpty) ...[
@@ -340,15 +506,45 @@ class _GcodeTerminalState extends State<_GcodeTerminal> {
             ),
           ),
           const SizedBox(width: 6),
-          NeuoButton.icon(
-            icon: Icon(LucideIcons.send, size: 18),
-            borderRadius: 10,
-            padding: const EdgeInsets.all(8),
-            accentColor: c.accent,
-            onPressed: () => _send(_ctrl.text),
-          ),
+          _SendButton(onPressed: () => _send(_ctrl.text), c: c),
         ]),
       ]),
+    );
+  }
+}
+
+// ---- 发送按钮 ----
+class _SendButton extends StatefulWidget {
+  const _SendButton({required this.onPressed, required this.c});
+  final VoidCallback onPressed;
+  final NeuoColors c;
+
+  @override
+  State<_SendButton> createState() => _SendButtonState();
+}
+
+class _SendButtonState extends State<_SendButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.c.background,
+          borderRadius: 10,
+          depth: _pressed ? 2 : 5,
+          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+        ),
+        padding: const EdgeInsets.all(8),
+        child: Icon(LucideIcons.send, size: 18, color: widget.c.accent),
+      ),
     );
   }
 }
@@ -369,47 +565,114 @@ class _CalibrationPanelState extends State<_CalibrationPanel> {
   @override
   Widget build(BuildContext context) {
     final c = widget.c;
-    return NeuoCard(
-      borderRadius: 14,
-      depth: 4,
-      intensity: 0.6,
+    return FlutterNeumorphism(
+      style: NeumorphismStyle(
+        color: c.background,
+        borderRadius: 14,
+        depth: 6,
+      ),
       padding: const EdgeInsets.all(12),
       child: Column(children: [
-        _toggle('热床调平', _bed, (v) => setState(() => _bed = v), c),
+        _Toggle(label: '热床调平', value: _bed, onChanged: (v) => setState(() => _bed = v), c: c),
         const SizedBox(height: 8),
-        _toggle('电机噪声', _motor, (v) => setState(() => _motor = v), c),
+        _Toggle(label: '电机噪声', value: _motor, onChanged: (v) => setState(() => _motor = v), c: c),
         const SizedBox(height: 8),
-        _toggle('振动补偿', _vib, (v) => setState(() => _vib = v), c),
+        _Toggle(label: '振动补偿', value: _vib, onChanged: (v) => setState(() => _vib = v), c: c),
         const SizedBox(height: 14),
-        NeuoButton.fab(
-          icon: _running ? Icon(LucideIcons.loader, size: 18) : Icon(LucideIcons.play, size: 18),
-          label: Text(_running ? '校准中...' : '开始', style: TextStyle(fontSize: 12)),
-          borderRadius: 12,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          accentColor: _running ? c.textSecondary : c.accent,
+        _StartButton(
+          running: _running,
           onPressed: _running ? null : () async {
             setState(() => _running = true);
             await widget.printer.calibrate(bedLevel: _bed, motorNoise: _motor, vibration: _vib);
             setState(() => _running = false);
           },
+          c: c,
         ),
       ]),
     );
   }
+}
 
-  Widget _toggle(String label, bool val, ValueChanged<bool> onChanged, NeuoColors c) {
+// ---- 开关按钮 ----
+class _Toggle extends StatefulWidget {
+  const _Toggle({required this.label, required this.value, required this.onChanged, required this.c});
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final NeuoColors c;
+
+  @override
+  State<_Toggle> createState() => _ToggleState();
+}
+
+class _ToggleState extends State<_Toggle> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
     return Row(children: [
-      Expanded(child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: c.textPrimary))),
-      NeuoButton(
-        label: Text(val ? '开' : '关', style: TextStyle(fontSize: 12)),
-        borderRadius: 8,
-        depth: val ? 3 : 5,
-        intensity: val ? 0.6 : 0.8,
-        backgroundColor: val ? c.accent.withValues(alpha: 0.15) : null,
-        accentColor: val ? c.accent : null,
-        onPressed: () => onChanged(!val),
+      Expanded(child: Text(widget.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: widget.c.textPrimary))),
+      GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          widget.onChanged(!widget.value);
+        },
+        onTapCancel: () => setState(() => _pressed = false),
+        child: FlutterNeumorphism(
+          style: NeumorphismStyle(
+            color: widget.value ? widget.c.accent.withValues(alpha: 0.15) : widget.c.background,
+            borderRadius: 8,
+            depth: _pressed ? 2 : (widget.value ? 3 : 5),
+            type: _pressed ? NeumorphismType.pressed : (widget.value ? NeumorphismType.pressed : NeumorphismType.flat),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text(widget.value ? '开' : '关', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: widget.value ? widget.c.accent : widget.c.textSecondary)),
+        ),
       ),
     ]);
+  }
+}
+
+// ---- 开始按钮 ----
+class _StartButton extends StatefulWidget {
+  const _StartButton({required this.running, required this.onPressed, required this.c});
+  final bool running;
+  final VoidCallback? onPressed;
+  final NeuoColors c;
+
+  @override
+  State<_StartButton> createState() => _StartButtonState();
+}
+
+class _StartButtonState extends State<_StartButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = widget.onPressed == null;
+    return GestureDetector(
+      onTapDown: disabled ? null : (_) => setState(() => _pressed = true),
+      onTapUp: disabled ? null : (_) {
+        setState(() => _pressed = false);
+        widget.onPressed?.call();
+      },
+      onTapCancel: disabled ? null : () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.running ? widget.c.textSecondary.withValues(alpha: 0.12) : widget.c.accent.withValues(alpha: 0.12),
+          borderRadius: 12,
+          depth: _pressed ? 2 : 5,
+          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(widget.running ? LucideIcons.loader : LucideIcons.play, size: 18, color: widget.running ? widget.c.textSecondary : widget.c.accent),
+          const SizedBox(width: 6),
+          Text(widget.running ? '校准中...' : '开始', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: widget.running ? widget.c.textSecondary : widget.c.accent)),
+        ]),
+      ),
+    );
   }
 }
 
@@ -417,4 +680,229 @@ class _Entry {
   final String cmd;
   final bool ok;
   const _Entry({required this.cmd, required this.ok});
+}
+
+// ---- 进退料面板 ----
+class _FilamentPanel extends StatefulWidget {
+  const _FilamentPanel({required this.printer, required this.hasAms, required this.c});
+  final PrinterProvider printer;
+  final bool hasAms;
+  final NeuoColors c;
+
+  @override
+  State<_FilamentPanel> createState() => _FilamentPanelState();
+}
+
+class _FilamentPanelState extends State<_FilamentPanel> {
+  int _temp = 220;
+  int _length = 50;
+  bool _loading = false;
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    if (widget.hasAms) {
+      await widget.printer.loadFilament();
+    } else {
+      await widget.printer.manualLoadFilament(_temp, _length);
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _unload() async {
+    setState(() => _loading = true);
+    if (widget.hasAms) {
+      await widget.printer.unloadFilament();
+    } else {
+      await widget.printer.manualUnloadFilament(_temp, _length);
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+
+    return FlutterNeumorphism(
+      style: NeumorphismStyle(color: c.background, borderRadius: 14, depth: 5),
+      padding: const EdgeInsets.all(12),
+      child: Column(children: [
+        // AMS状态提示
+        Row(children: [
+          Icon(widget.hasAms ? LucideIcons.packageCheck : LucideIcons.packageX, size: 16,
+              color: widget.hasAms ? Colors.green : c.textSecondary),
+          const SizedBox(width: 6),
+          Text(widget.hasAms ? 'AMS已连接 - 自动进退料' : '无AMS - 手动进退料',
+              style: TextStyle(fontSize: 12, color: widget.hasAms ? Colors.green : c.textSecondary)),
+        ]),
+        const SizedBox(height: 12),
+        // 无AMS时显示温度和长度设置
+        if (!widget.hasAms) ...[
+          Row(children: [
+            Expanded(child: _TempInput(value: _temp, onChanged: (v) => setState(() => _temp = v), c: c)),
+            const SizedBox(width: 10),
+            Expanded(child: _LengthInput(value: _length, onChanged: (v) => setState(() => _length = v), c: c)),
+          ]),
+          const SizedBox(height: 12),
+          Container(height: 1, color: c.textSecondary.withValues(alpha: 0.1)),
+          const SizedBox(height: 12),
+        ],
+        // 进退料按钮
+        if (_loading)
+          const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+        else
+          Row(children: [
+            Expanded(child: _FilamentBtn(icon: LucideIcons.arrowDownToLine, label: '进料', color: Colors.green, onPressed: _load, c: c)),
+            const SizedBox(width: 10),
+            Expanded(child: _FilamentBtn(icon: LucideIcons.arrowUpFromLine, label: '退料', color: Colors.orange, onPressed: _unload, c: c)),
+          ]),
+      ]),
+    );
+  }
+}
+
+// ---- 温度输入 ----
+class _TempInput extends StatefulWidget {
+  const _TempInput({required this.value, required this.onChanged, required this.c});
+  final int value;
+  final ValueChanged<int> onChanged;
+  final NeuoColors c;
+
+  @override
+  State<_TempInput> createState() => _TempInputState();
+}
+
+class _TempInputState extends State<_TempInput> {
+  late final _ctrl = TextEditingController(text: widget.value.toString());
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Icon(LucideIcons.flame, size: 16, color: widget.c.accent),
+      const SizedBox(width: 6),
+      Text('温度', style: TextStyle(fontSize: 12, color: widget.c.textSecondary)),
+      const SizedBox(width: 6),
+      SizedBox(
+        width: 60,
+        child: TextField(
+          controller: _ctrl,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: widget.c.textPrimary),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: widget.c.background,
+            isDense: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          ),
+          onChanged: (v) {
+            final n = int.tryParse(v);
+            if (n != null && n > 0 && n <= 300) widget.onChanged(n);
+          },
+        ),
+      ),
+      Text('°C', style: TextStyle(fontSize: 12, color: widget.c.textSecondary)),
+    ]);
+  }
+}
+
+// ---- 长度输入 ----
+class _LengthInput extends StatefulWidget {
+  const _LengthInput({required this.value, required this.onChanged, required this.c});
+  final int value;
+  final ValueChanged<int> onChanged;
+  final NeuoColors c;
+
+  @override
+  State<_LengthInput> createState() => _LengthInputState();
+}
+
+class _LengthInputState extends State<_LengthInput> {
+  late final _ctrl = TextEditingController(text: widget.value.toString());
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Icon(LucideIcons.ruler, size: 16, color: widget.c.accent),
+      const SizedBox(width: 6),
+      Text('长度', style: TextStyle(fontSize: 12, color: widget.c.textSecondary)),
+      const SizedBox(width: 6),
+      SizedBox(
+        width: 50,
+        child: TextField(
+          controller: _ctrl,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: widget.c.textPrimary),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: widget.c.background,
+            isDense: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          ),
+          onChanged: (v) {
+            final n = int.tryParse(v);
+            if (n != null && n > 0 && n <= 200) widget.onChanged(n);
+          },
+        ),
+      ),
+      Text('mm', style: TextStyle(fontSize: 12, color: widget.c.textSecondary)),
+    ]);
+  }
+}
+
+// ---- 进退料按钮 ----
+class _FilamentBtn extends StatefulWidget {
+  const _FilamentBtn({required this.icon, required this.label, required this.color, required this.onPressed, required this.c});
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onPressed;
+  final NeuoColors c;
+
+  @override
+  State<_FilamentBtn> createState() => _FilamentBtnState();
+}
+
+class _FilamentBtnState extends State<_FilamentBtn> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.c.background,
+          borderRadius: 12,
+          depth: _pressed ? 2 : 5,
+          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(widget.icon, size: 18, color: widget.color),
+          const SizedBox(width: 6),
+          Text(widget.label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: widget.color)),
+        ]),
+      ),
+    );
+  }
 }

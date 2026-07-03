@@ -152,7 +152,7 @@ class PrinterState {
     return base.copyWith(online: true);
   }
 
-  /// 从 info.module 检测 AMS 是否存在
+  /// 从 info.module 检测 AMS 是否存在（通过SN号判断）
   static bool _checkAmsExist(Map<String, dynamic> info) {
     final modules = info['module'];
     if (modules is List) {
@@ -160,7 +160,14 @@ class PrinterState {
         if (m is Map<String, dynamic>) {
           final name = m['name']?.toString().toLowerCase() ?? '';
           if (name.contains('ams')) {
-            return true;
+            // 检查SN号是否有效（不为空且不是占位符）
+            final sn = m['sn']?.toString() ?? '';
+            if (sn.isNotEmpty &&
+                sn != 'STUDY0ONLY' &&
+                sn != 'NULL' &&
+                sn.length > 5) {  // 真实SN号通常较长
+              return true;
+            }
           }
         }
       }
@@ -187,6 +194,7 @@ class PrinterState {
         return PrintStatus.idle;
       case GcodeState.running:
       case GcodeState.prepare:
+      case GcodeState.slicing:
         return PrintStatus.printing;
       case GcodeState.pause:
         return PrintStatus.pausedUser;
@@ -194,6 +202,8 @@ class PrinterState {
         return PrintStatus.idle;
       case GcodeState.failed:
         return PrintStatus.unknown;
+      case GcodeState.init:
+      case GcodeState.offline:
       case GcodeState.unknown:
         return PrintStatus.unknown;
     }

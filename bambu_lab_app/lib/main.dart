@@ -15,7 +15,11 @@ import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  final database = AppDatabase();
+  DebugLog.setDatabase(database);
   DebugLog.init();
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
@@ -27,12 +31,14 @@ void main() async {
     statusBarColor: Colors.transparent,
   ));
 
-  final database = AppDatabase();
   final configProvider = PrinterConfigProvider(database);
   await configProvider.loadPrinters();
 
   final printerProvider = PrinterProvider();
   final amsProvider = AmsProvider(printerProvider);
+
+  // 从数据库加载历史日志
+  await DebugLog.loadFromDb();
 
   // runApp 后重新设置全屏（部分 ROM 会重置）
   WidgetsBinding.instance.addPostFrameCallback((_) {

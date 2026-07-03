@@ -324,6 +324,10 @@ class _FilamentTrayTile extends StatelessWidget {
       if (cleaned.length == 6) {
         return Color(int.parse('FF$cleaned', radix: 16));
       }
+      if (cleaned.length == 8) {
+        // AARRGGBB — 直接解析，alpha 已在首位
+        return Color(int.parse(cleaned, radix: 16));
+      }
       return null;
     } on FormatException {
       return null;
