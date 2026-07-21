@@ -3,10 +3,10 @@
 Bambu Lab 打印机模拟器
 ======================
 连接到本地 MQTT broker，模拟打印机发布状态消息。
-用于测试 Flutter App 的 UI 状态更新。
+用于测试 Flutter App 的 UI 状态更新和 FTP 文件功能。
 
 使用方法：
-    pip install paho-mqtt
+    pip install paho-mqtt pyftpdlib
     python tools/bambu_printer_simulator.py
 
 模拟器会：
@@ -14,10 +14,16 @@ Bambu Lab 打印机模拟器
     - 响应 App 的控制命令（暂停/继续/停止等）
     - 模拟 AMS 耗材信息
     - 模拟 get_version 设备信息
+    - 启动 FTP 服务器（端口 9990），用于测试文件浏览/下载
 """
 
+import datetime
 import json
+import os
 import random
+import shutil
+import ssl
+import tempfile
 import time
 import threading
 
@@ -26,6 +32,25 @@ try:
 except ImportError:
     print("需要安装 paho-mqtt: pip install paho-mqtt")
     exit(1)
+
+try:
+    from pyftpdlib.authorizers import DummyAuthorizer
+    from pyftpdlib.handlers import FTPHandler, TLS_FTPHandler
+    from pyftpdlib.servers import FTPServer
+    HAS_FTP = True
+except ImportError:
+    HAS_FTP = False
+    print("[注意] pyftpdlib 未安装，FTP 功能不可用: pip install pyftpdlib")
+
+try:
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.backends import default_backend
+    HAS_CRYPTO = True
+except ImportError:
+    HAS_CRYPTO = False
 
 # 配置
 BROKER_HOST = "127.0.0.1"
@@ -316,6 +341,11 @@ class PrinterSimulator:
         self.sequence_id = 0
         self.light_on = True
 
+        # FTP 服务器
+        self.ftp_server = None
+        self.ftp_server_thread = None
+        self.ftp_temp_dir = None
+
     def on_connect(self, client, userdata, flags, rc):
         print(f"[OK] 已连接到 broker {BROKER_HOST}:{BROKER_PORT}")
         self.connected = True
@@ -510,12 +540,234 @@ class PrinterSimulator:
         self.client.publish(topic, json.dumps(self.info_state))
         print(f"  -> get_version: {PROJECT_NAME}")
 
+    @staticmethod
+    def _select_model() -> str:
+        """启动时让用户选择模拟的打印机型号"""
+        models = [
+            ("N1",  "A1 Mini"),
+            ("N2S", "A1"),
+            ("N9",  "A2L"),
+            ("C11", "P1P"),
+            ("C12", "P1S"),
+            ("3DPrinter-X1",         "X1"),
+            ("3DPrinter-X1-Carbon",  "X1-Carbon"),
+            ("C13", "X1E"),
+        ]
+        print("=" * 50)
+        print("选择要模拟的打印机型号:")
+        for i, (_, name) in enumerate(models, 1):
+            print(f"  {i}. {name}")
+        print("=" * 50)
+        while True:
+            try:
+                choice = input(f"请输入编号 (1-{len(models)}, 默认 1): ").strip()
+                if not choice:
+                    idx = 0
+                else:
+                    idx = int(choice) - 1
+                if 0 <= idx < len(models):
+                    project_name, display = models[idx]
+                    print(f"\n已选择: {display} ({project_name})\n")
+                    return project_name
+            except (ValueError, IndexError):
+                pass
+            print(f"无效输入，请输入 1-{len(models)}")
+
+    # --- FTP 服务器 ---
+
+    def _create_ftp_test_files(self, base_dir: str):
+        """创建模拟打印机目录结构及测试文件"""
+        dirs = {
+            "cache": [],
+            "image": [],
+            "timelapse": [],
+            "Metadata": [],
+        }
+        for d in dirs:
+            os.makedirs(os.path.join(base_dir, d), exist_ok=True)
+
+        # cache 目录 — 模拟打印文件
+        cache_dir = os.path.join(base_dir, "cache")
+        for fname in ["test_print.3mf", "benchy.gcode.3mf", "calibration.gcode"]:
+            path = os.path.join(cache_dir, fname)
+            with open(path, "w") as f:
+                f.write(f"// 模拟文件: {fname}\n")
+            dirs["cache"].append(path)
+
+        # image 目录 — 模拟预览图（生成一个 1x1 PNG）
+        img_dir = os.path.join(base_dir, "image")
+        # 最小的有效 PNG 文件（1x1 像素红色）
+        png_bytes = bytes([
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  # PNG signature
+            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,  # IHDR chunk
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+            0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,  # IDAT chunk
+            0x54, 0x08, 0xD7, 0x63, 0x60, 0x60, 0x00, 0x00,
+            0x00, 0x04, 0x00, 0x01, 0x27, 0x34, 0x27, 0x8C,
+            0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,  # IEND chunk
+            0xAE, 0x42, 0x60, 0x82,
+        ])
+        for fname in ["preview_1.png", "preview_2.png", "thumbs.png"]:
+            path = os.path.join(img_dir, fname)
+            with open(path, "wb") as f:
+                f.write(png_bytes)
+
+        # timelapse 目录 — 模拟延时摄影文件
+        tl_dir = os.path.join(base_dir, "timelapse")
+        for fname in ["print_1.mp4", "print_2.mp4"]:
+            path = os.path.join(tl_dir, fname)
+            with open(path, "w") as f:
+                f.write(f"// 模拟延时摄影: {fname}\n")
+
+        # Metadata 目录 — 模拟打印配置
+        meta_dir = os.path.join(base_dir, "Metadata")
+        for fname in ["plate_1.gcode", "plate_1.png", "slice_info.config"]:
+            path = os.path.join(meta_dir, fname)
+            with open(path, "w") as f:
+                f.write("// 模拟元数据\n")
+
+        return dirs
+
+    @staticmethod
+    def _generate_self_signed_cert(cert_path: str, key_path: str):
+        """生成自签名 SSL 证书（用 cryptography 库）"""
+        if not HAS_CRYPTO:
+            return False
+
+        key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+            backend=default_backend(),
+        )
+
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "CN"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Bambu Simulator"),
+            x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1"),
+        ])
+
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(subject)
+            .issuer_name(issuer)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
+            .not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365))
+            .add_extension(
+                x509.SubjectAlternativeName([x509.DNSName("127.0.0.1"), x509.DNSName("localhost")]),
+                critical=False,
+            )
+            .sign(key, hashes.SHA256(), backend=default_backend())
+        )
+
+        with open(key_path, "wb") as f:
+            f.write(key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            ))
+        with open(cert_path, "wb") as f:
+            f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+        return True
+
+    def start_ftp_server(self):
+        """启动 FTP 服务器供 App 测试。
+        
+        优先使用 TLS（端口 9991），如果 cryptography 不可用则回退到明文（端口 9990）。
+        App 测试时需将 PrinterFtpService 的 port 改为对应端口。
+        """
+        if not HAS_FTP:
+            print("[FTP] pyftpdlib 未安装，跳过 FTP 服务器启动")
+            return
+
+        if self.ftp_server is not None:
+            return
+
+        # 创建临时目录并填充测试文件
+        self.ftp_temp_dir = tempfile.mkdtemp(prefix="bambu_sim_ftp_")
+        self._create_ftp_test_files(self.ftp_temp_dir)
+
+        # 配置用户认证
+        authorizer = DummyAuthorizer()
+        authorizer.add_anonymous(self.ftp_temp_dir, perm="elr")
+        authorizer.add_user("bblp", "12345678", self.ftp_temp_dir, perm="elrafw")
+
+        # 尝试 TLS 模式（匹配真实打印机的隐式 FTPS）
+        use_tls = HAS_CRYPTO
+        if use_tls:
+            cert_path = os.path.join(self.ftp_temp_dir, "server.crt")
+            key_path = os.path.join(self.ftp_temp_dir, "server.key")
+            if not self._generate_self_signed_cert(cert_path, key_path):
+                use_tls = False
+
+        if use_tls:
+            FTP_PORT = 9991
+            handler = TLS_FTPHandler
+            handler.certfile = cert_path
+            handler.keyfile = key_path
+            # 隐式 FTPS：连接即 TLS，不需要 AUTH TLS 命令
+            handler.tls_control_required = True
+            handler.tls_data_required = True
+            sec_type = "ftps"
+        else:
+            FTP_PORT = 9990
+            handler = FTPHandler
+            sec_type = "plain"
+
+        handler.authorizer = authorizer
+
+        self.ftp_server = FTPServer(("127.0.0.1", FTP_PORT), handler)
+
+        self.ftp_server_thread = threading.Thread(
+            target=self.ftp_server.serve_forever,
+            daemon=True,
+            name="FTPServer",
+        )
+        self.ftp_server_thread.start()
+
+        if use_tls:
+            print(f"[FTP] TLS 服务器已启动: ftps://127.0.0.1:{FTP_PORT}/")
+            print(f"[FTP]   用户: bblp / 密码: 12345678")
+            print(f"[FTP]   修改 PrinterFtpService: port = {FTP_PORT}, SecurityType.ftps")
+        else:
+            print(f"[FTP] 明文服务器已启动: ftp://127.0.0.1:{FTP_PORT}/")
+            print(f"[FTP]   用户: bblp / 密码: 12345678")
+            print(f"[FTP]   修改 PrinterFtpService: port = {FTP_PORT}, SecurityType.ftp")
+
+    def stop_ftp_server(self):
+        """停止 FTP 服务器并清理临时文件"""
+        if self.ftp_server is not None:
+            print("[FTP] 服务器正在停止...")
+            self.ftp_server.close_all()
+            self.ftp_server = None
+            self.ftp_server_thread = None
+
+        if self.ftp_temp_dir is not None:
+            shutil.rmtree(self.ftp_temp_dir, ignore_errors=True)
+            self.ftp_temp_dir = None
+
     def run(self):
+        global PROJECT_NAME
+        PROJECT_NAME = self._select_model()
+
+        # 根据型号更新设备信息中的 project_name
+        for mod in self.info_state["info"]["module"]:
+            if mod.get("name") in ("ota", "esp32", "mc"):
+                mod["project_name"] = PROJECT_NAME
+
+        # 根据机型调整初始温度：开放机型无 chamber_temp
+        is_enclosed = PROJECT_NAME in ("3DPrinter-X1", "3DPrinter-X1-Carbon", "C13", "C12")
+        if not is_enclosed:
+            self.print_state.pop("chamber_temper", None)
+
         print("=" * 50)
         print("Bambu Lab 打印机模拟器")
         print("=" * 50)
         print(f"序列号: {SERIAL_NUMBER}")
-        print(f"设备型号: {PROJECT_NAME} (A1 Mini)")
+        print(f"设备型号: {PROJECT_NAME}")
         print(f"Broker: {BROKER_HOST}:{BROKER_PORT}")
         print()
         print("在 App 中添加打印机:")
@@ -523,9 +775,13 @@ class PrinterSimulator:
         print(f"  序列号: {SERIAL_NUMBER}")
         print(f"  访问码: (任意)")
         print(f"  TLS:    关闭 (端口 1883)")
+        print(f"  FTP:   端口 9991 (TLS) / 9990 (明文), 用户 bblp / 密码 12345678")
         print()
-        print("命令: start / stop / pause / resume / light / quit")
+        print("命令: start / stop / pause / resume / light / ftp / quit")
         print("=" * 50)
+
+        # 启动 FTP 服务器
+        self.start_ftp_server()
 
         self.client.connect(BROKER_HOST, BROKER_PORT, 60)
         self.client.loop_start()
@@ -543,11 +799,18 @@ class PrinterSimulator:
                     self.resume_print()
                 elif cmd == "light":
                     self.set_light(not self.light_on)
+                elif cmd == "ftp":
+                    if HAS_FTP and self.ftp_server:
+                        print(f"[FTP] 运行中: ftp://127.0.0.1:9990/")
+                        print(f"[FTP]   用户: bblp / 密码: 12345678")
+                    else:
+                        print("[FTP] 未启动（需要 pyftpdlib）")
                 elif cmd in ("quit", "exit"):
                     break
         except KeyboardInterrupt:
             pass
 
+        self.stop_ftp_server()
         self.client.loop_stop()
         self.client.disconnect()
         print("\n模拟器已停止")

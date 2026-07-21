@@ -3,7 +3,9 @@ library;
 
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 
+import 'package:archive/archive.dart';
 import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -44,7 +46,9 @@ class PrinterFtpService {
         user: 'bblp',
         pass: accessCode,
         port: port,
-        securityType: SecurityType.ftpes,
+        // 使用隐式 FTPS（端口 990，TLS 从连接开始）。不要用 ftpes（显式），
+        // 那需要先明文连接再 AUTH TLS 升级，和打印机不兼容。
+        securityType: SecurityType.ftps,
         timeout: 30, // 增加超时时间
         showLog: true, // 启用调试日志
       );
@@ -159,6 +163,97 @@ class PrinterFtpService {
       _lastError = '获取预览图片失败: $e';
       // ignore: avoid_print
       print('[FTP] 获取预览图片失败: $e');
+      return null;
+    }
+  }
+
+  /// 从 .3mf 文件中提取打印缩略图（封面图）
+  ///
+  /// [subtaskName] MQTT 推送的 subtask_name，用于匹配 .3mf 文件名
+  /// 返回 Metadata/plate_X.png 的字节数据
+  Future<Uint8List?> fetchCoverImageFrom3mf(String subtaskName) async {
+    if (_client == null) return null;
+    try {
+      // 1. 构建候选文件名（.3mf 或 .gcode.3mf）
+      final candidates = <String>[
+        if (subtaskName.endsWith('.3mf')) subtaskName,
+        if (!subtaskName.endsWith('.3mf')) '$subtaskName.3mf',
+        if (!subtaskName.endsWith('.3mf')) '$subtaskName.gcode.3mf',
+      ];
+
+      // 2. 在 /cache 目录下查找匹配的 .3mf 文件
+      await _client!.changeDirectory('/cache');
+      final entries = await _client!.listDirectoryContent();
+      final modelEntry = entries.cast<FTPEntry?>().firstWhere(
+        (e) => e != null && e.type != FTPEntryType.dir && candidates.any((c) => e.name == c),
+        orElse: () => null,
+      );
+
+      if (modelEntry == null) {
+        _lastError = '未在 /cache 找到匹配的 .3mf 文件';
+        return null;
+      }
+
+      // 3. 下载 .3mf 文件到临时目录
+      final tempDir = await getTemporaryDirectory();
+      final localFile = File('${tempDir.path}/${modelEntry.name}');
+
+      // 如果临时文件已存在且大小匹配，跳过下载
+      if (!localFile.existsSync() || localFile.lengthSync() != (modelEntry.size ?? 0)) {
+        final ok = await _client!.downloadFile(modelEntry.name, localFile);
+        if (!ok || !localFile.existsSync()) {
+          _lastError = '下载 .3mf 文件失败';
+          return null;
+        }
+      }
+
+      // 4. 读取 .3mf（ZIP 格式）并解析
+      final bytes = localFile.readAsBytesSync();
+      final archive = ZipDecoder().decodeBytes(bytes);
+
+      // 5. 读取 slice_info.config 提取 plate 编号
+      ArchiveFile? configEntry;
+      for (final f in archive) {
+        if (f.name == 'Metadata/slice_info.config') {
+          configEntry = f;
+          break;
+        }
+      }
+      if (configEntry == null) {
+        _lastError = '.3mf 中未找到 Metadata/slice_info.config';
+        return null;
+      }
+
+      final configXml = utf8.decode(configEntry.content as List<int>);
+      final plateMatch = RegExp(r'key="index"\s+value="(\d+)"').firstMatch(configXml);
+      final plateNum = plateMatch?.group(1);
+      if (plateNum == null) {
+        _lastError = '未能在 slice_info.config 中找到 plate 编号';
+        return null;
+      }
+
+      // 6. 读取 Metadata/plate_{plateNum}.png
+      ArchiveFile? pngEntry;
+      for (final f in archive) {
+        if (f.name == 'Metadata/plate_$plateNum.png') {
+          pngEntry = f;
+          break;
+        }
+      }
+      if (pngEntry == null) {
+        _lastError = '.3mf 中未找到 Metadata/plate_$plateNum.png';
+        return null;
+      }
+
+      final rawContent = pngEntry.content;
+      if (rawContent is List<int>) {
+        return Uint8List.fromList(rawContent);
+      }
+      return null;
+    } catch (e) {
+      _lastError = '从 .3mf 提取缩略图失败: $e';
+      // ignore: avoid_print
+      print('[FTP] 提取缩略图失败: $e');
       return null;
     }
   }

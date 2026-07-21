@@ -70,6 +70,25 @@ enum PrinterType {
           true,
         _ => false,
       };
+
+  /// 是否有箱体温度传感器
+  /// X1/X1C/X1E/P1S 为全封闭机型，有箱体温度检测
+  /// P1P/A1/A1 Mini 为开放框架，无机箱温度
+  /// A2L 虽为封闭机型但暂无箱体温度数据
+  bool get hasChamberTemp => switch (this) {
+        PrinterType.x1 ||
+        PrinterType.x1c ||
+        PrinterType.x1e ||
+        PrinterType.p1s =>
+          true,
+        _ => false,
+      };
+
+  /// 是否支持双喷头
+  /// 当前所有机型均为单喷头，预留未来扩展
+  bool get hasDualNozzle => switch (this) {
+        _ => false,
+      };
 }
 
 /// 喷嘴类型枚举 - 对应 Python NozzleType

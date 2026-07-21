@@ -102,13 +102,13 @@ class _NavItemState extends State<_NavItem> {
       onTapCancel: () => setState(() => _pressed = false),
       child: FlutterNeumorphism(
         style: NeumorphismStyle(
-          color: widget.selected ? widget.c.accent.withValues(alpha: 0.15) : widget.c.background,
-          borderRadius: 16,
+          color: widget.c.background,
+          borderRadius: 12,
           depth: _pressed ? 2 : (widget.selected ? 3 : 5),
           type: _pressed ? NeumorphismType.pressed : (widget.selected ? NeumorphismType.pressed : NeumorphismType.flat),
         ),
-        padding: const EdgeInsets.all(12),
-        child: Icon(widget.icon, color: widget.selected ? widget.c.accent : widget.c.textSecondary, size: 24),
+        padding: const EdgeInsets.all(10),
+        child: Icon(widget.icon, color: widget.selected ? widget.c.accent : widget.c.textSecondary.withValues(alpha: 0.5), size: 22),
       ),
     );
   }

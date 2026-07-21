@@ -167,9 +167,9 @@ class _AddButtonState extends State<_AddButton> {
         margin: const EdgeInsets.only(bottom: 2, right: 2),
         child: FlutterNeumorphism(
           style: NeumorphismStyle(
-            color: widget.c.accent.withValues(alpha: 0.12),
-            borderRadius: 16,
-            depth: _pressed ? 3 : 6,
+            color: widget.c.background,
+            borderRadius: 12,
+            depth: _pressed ? 2 : 5,
             type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

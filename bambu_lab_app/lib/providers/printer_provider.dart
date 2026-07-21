@@ -138,7 +138,7 @@ class PrinterProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 获取预览图片
+  /// 获取预览图片（优先从 .3mf 提取缩略图，fallback 到 /image 目录）
   Future<void> fetchPreviewImage() async {
     if (_ftp == null || !_ftp!.isConnected) {
       _previewError = 'FTP 未连接';
@@ -151,7 +151,19 @@ class PrinterProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final image = await _ftp!.getLatestPreviewImage();
+      Uint8List? image;
+
+      // 优先从 .3mf 提取缩略图（需要 subtaskName）
+      final subtaskName = _state.subtaskName;
+      if (subtaskName != null && subtaskName.isNotEmpty) {
+        image = await _ftp!.fetchCoverImageFrom3mf(subtaskName);
+      }
+
+      // fallback: 从 /image 目录获取摄像头快照
+      if (image == null) {
+        image = await _ftp!.getLatestPreviewImage();
+      }
+
       if (image != null) {
         _previewImage = image;
         _previewError = null;
@@ -172,6 +184,14 @@ class PrinterProvider extends ChangeNotifier {
         newState.printerType != PrinterType.unknown) {
       onPrinterTypeDetected?.call(newState.printerType);
     }
+
+    // 检测到新的打印任务开始 → 自动刷新预览图
+    final prevFile = _state.subtaskName;
+    final newFile = newState.subtaskName;
+    if (prevFile != newFile && newFile != null && newFile.isNotEmpty) {
+      fetchPreviewImage();
+    }
+
     _state = newState;
     notifyListeners();
   }
@@ -197,6 +217,8 @@ class PrinterProvider extends ChangeNotifier {
   Future<bool> autoHome() async => _service?.autoHome() ?? false;
   Future<bool> sendGcode(String cmd) async =>
       _service?.sendGcode(cmd) ?? false;
+  Future<bool> skipPrintObject() async =>
+      _service?.skipObjects(const []) ?? false;
   Future<bool> calibrate({bool bedLevel = true, bool motorNoise = true, bool vibration = true}) async =>
       _service?.calibrate(bedLeveling: bedLevel, motorNoiseCancellation: motorNoise, vibrationCompensation: vibration) ?? false;
   bool pushAll() => _service?.pushAll() ?? false;

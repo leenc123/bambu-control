@@ -279,9 +279,9 @@ class _TlsTileState extends State<_TlsTile> {
       child: FlutterNeumorphism(
         style: NeumorphismStyle(
           color: widget.c.background,
-          borderRadius: 14,
-          depth: _pressed ? 3 : 5,
-          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+          borderRadius: 12,
+          depth: _pressed ? 2 : (widget.useTls ? 3 : 5),
+          type: _pressed ? NeumorphismType.pressed : (widget.useTls ? NeumorphismType.pressed : NeumorphismType.flat),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(children: [
@@ -289,7 +289,16 @@ class _TlsTileState extends State<_TlsTile> {
             Text('TLS 加密', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: widget.c.textPrimary)),
             Text(widget.useTls ? '端口 8883 — 真实打印机' : '端口 1883 — 本地测试', style: TextStyle(fontSize: 11, color: widget.c.textSecondary)),
           ])),
-          Switch(value: widget.useTls, onChanged: widget.onChanged, activeTrackColor: widget.c.accent.withValues(alpha: 0.35), activeThumbColor: widget.c.accent),
+          FlutterNeumorphism(
+            style: NeumorphismStyle(
+              color: widget.c.background,
+              borderRadius: 12,
+              depth: _pressed ? 2 : (widget.useTls ? 3 : 5),
+              type: _pressed ? NeumorphismType.pressed : (widget.useTls ? NeumorphismType.pressed : NeumorphismType.flat),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Text(widget.useTls ? '开' : '关', style: TextStyle(fontSize: 13, fontWeight: widget.useTls ? FontWeight.w600 : FontWeight.w400, color: widget.useTls ? widget.c.accent : widget.c.textSecondary)),
+          ),
         ]),
       ),
     );
@@ -357,9 +366,9 @@ class _SaveButtonState extends State<_SaveButton> {
       onTapCancel: () => setState(() => _pressed = false),
       child: FlutterNeumorphism(
         style: NeumorphismStyle(
-          color: widget.c.accent.withValues(alpha: 0.12),
-          borderRadius: 14,
-          depth: _pressed ? 3 : 6,
+          color: widget.c.background,
+          borderRadius: 12,
+          depth: _pressed ? 2 : 5,
           type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
         ),
         padding: const EdgeInsets.symmetric(vertical: 13),

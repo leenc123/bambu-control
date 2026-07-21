@@ -8,7 +8,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import 'package:bambu_lab_app/providers/printer_provider.dart';
-import 'package:bambu_lab_app/version.dart';
+import 'package:bambu_lab_app/app_version.dart';
 import 'package:bambu_lab_app/providers/theme_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 import 'package:bambu_lab_app/utils/printer_image.dart';
@@ -29,8 +29,14 @@ class SettingsTab extends StatelessWidget {
         const SizedBox(height: 14),
         _sec('应用', c),
         const SizedBox(height: 8),
-        _TileBtn(icon: LucideIcons.info, title: '关于', subtitle: 'Bambu Lab App v$appVersion', c: c, onTap: () => showAboutDialog(
-            context: context, applicationName: 'Bambu Lab App', applicationVersion: appVersion, applicationLegalese: 'Powered by Flutter')),
+        FutureBuilder<String>(
+          future: getAppVersion(),
+          builder: (context, snapshot) {
+            final ver = snapshot.data ?? '...';
+            return _TileBtn(icon: LucideIcons.info, title: '关于', subtitle: 'Bambu Lab App v$ver', c: c, onTap: () => showAboutDialog(
+                context: context, applicationName: 'Bambu Lab App', applicationVersion: ver, applicationLegalese: 'Powered by Flutter'));
+          },
+        ),
         const SizedBox(height: 6),
         _TileBtn(icon: LucideIcons.bug, title: '调试信息', subtitle: '查看连接和状态详情', c: c, onTap: () => showDebugLog(context)),
         const SizedBox(height: 14),
@@ -179,6 +185,9 @@ class _TileBtnState extends State<_TileBtn> {
     );
   }
 }
+
+// ---- 辅助摄像机开关 ----
+
 
 // ---- 主题选择 ----
 class _ThemeSelector extends StatelessWidget {

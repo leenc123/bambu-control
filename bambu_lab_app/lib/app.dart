@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:bambu_lab_app/providers/theme_provider.dart';
+import 'package:bambu_lab_app/providers/screen_saver_provider.dart';
 import 'package:bambu_lab_app/screens/connect/connect_screen.dart';
 import 'package:bambu_lab_app/screens/dashboard/dashboard_screen.dart';
 import 'package:bambu_lab_app/screens/home/home_screen.dart';
@@ -49,12 +50,32 @@ class BambuLabApp extends StatelessWidget {
           routerConfig: _router,
           builder: (context, child) {
             final brightness = tp.resolveBrightness(context);
-            return NeuoTheme(
-              colors: brightness == Brightness.dark ? NeuoColors.dark : NeuoColors.light,
-              child: SafeArea(
-                left: true, right: true, top: false, bottom: false,
-                child: child!,
-              ),
+            return Consumer<ScreenSaverProvider>(
+              builder: (_, ss, __) {
+                return Listener(
+                  onPointerDown: (_) => ss.resetTimer(),
+                  onPointerMove: (_) => ss.resetTimer(),
+                  child: Stack(
+                    children: [
+                      NeuoTheme(
+                        colors: brightness == Brightness.dark ? NeuoColors.dark : NeuoColors.light,
+                        child: SafeArea(
+                          left: true, right: true, top: false, bottom: false,
+                          child: child!,
+                        ),
+                      ),
+                      if (ss.isActive)
+                        Positioned.fill(
+                          child: GestureDetector(
+                            onTap: () => ss.resetTimer(),
+                            behavior: HitTestBehavior.opaque,
+                            child: const ColoredBox(color: Colors.black),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
             );
           },
         );

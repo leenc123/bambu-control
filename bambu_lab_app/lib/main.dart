@@ -10,6 +10,7 @@ import 'package:bambu_lab_app/providers/ams_provider.dart';
 import 'package:bambu_lab_app/providers/printer_config_provider.dart';
 import 'package:bambu_lab_app/providers/printer_provider.dart';
 import 'package:bambu_lab_app/providers/theme_provider.dart';
+import 'package:bambu_lab_app/providers/screen_saver_provider.dart';
 import 'package:bambu_lab_app/utils/debug_log.dart';
 import 'package:flutter/services.dart';
 
@@ -62,6 +63,9 @@ void main() async {
         ChangeNotifierProvider<AmsProvider>.value(value: amsProvider),
         ChangeNotifierProvider<ThemeModeProvider>(
           create: (_) => ThemeModeProvider(),
+        ),
+        ChangeNotifierProvider<ScreenSaverProvider>(
+          create: (_) => ScreenSaverProvider(),
         ),
       ],
       child: const BambuLabApp(),

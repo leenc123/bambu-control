@@ -23,7 +23,7 @@ class BambuMqttClient {
     required this.accessCode,
     this.username = 'bblp',
     this.port = 8883,
-    this.keepAlivePeriod = 60,
+    this.keepAlivePeriod = 15,
     this.useTls = true,
   });
 
@@ -36,6 +36,7 @@ class BambuMqttClient {
   final bool useTls;
 
   MqttServerClient? _client;
+  StreamSubscription<List<MqttReceivedMessage<MqttMessage>>>? _updatesSubscription;
   String? _lastError;
   final StreamController<Map<String, dynamic>> _messageController =
       StreamController<Map<String, dynamic>>.broadcast();
@@ -46,8 +47,20 @@ class BambuMqttClient {
   /// Watchdog 计时器 - 60秒无数据则重新请求推送
   Timer? _watchdogTimer;
 
-  /// Watchdog 超时时间（秒）
-  static const int _watchdogTimeoutSeconds = 60;
+  /// 初始数据等待计时器 - 订阅后短时间未收到数据则重试
+  Timer? _initialDataTimer;
+
+  /// 标记等待初始推送，在 _onSubscribed 中清除并发送命令
+  bool _pendingInitialPush = false;
+
+  /// 初始数据重试次数（最多 2 次）
+  int _initialDataRetries = 0;
+
+  /// Watchdog 超时时间（秒）— 2 倍 keepalive，连接断开后能更快检测到
+  static const int _watchdogTimeoutSeconds = 30;
+
+  /// 初始数据等待超时（秒）
+  static const int _initialDataTimeoutSeconds = 15;
 
   /// 消息广播流 - 每次收到 MQTT 报告时触发
   Stream<Map<String, dynamic>> get messageStream =>
@@ -71,9 +84,11 @@ class BambuMqttClient {
 
   /// 连接到打印机 MQTT 服务器
   Future<bool> connect() async {
+    // 使用唯一 client ID 避免 amqtt broker 的 session 残留 bug（HA 组件同样做法）
+    final clientId = 'bblp_${serial}_${DateTime.now().millisecondsSinceEpoch}';
     final client = MqttServerClient.withPort(
       hostname,
-      'bblp_$serial',
+      clientId,
       port,
     );
 
@@ -93,15 +108,15 @@ class BambuMqttClient {
     // TLS 设置 - 仅在 useTls 为 true 时启用
     if (useTls) {
       // 跳过证书验证（局域网打印机使用自签名证书）
-      final context = SecurityContext(withTrustedRoots: false)
-        ..setAlpnProtocols(['mqtt'], false);
+      // 注意：不设置 ALPN，拓竹打印机的 MQTT broker 不支持 ALPN 协商 'mqtt'
+      final context = SecurityContext(withTrustedRoots: false);
       client.securityContext = context;
       client.secure = true;
       client.onBadCertificate = (Object certificate) => true;
     }
 
     final connMessage = MqttConnectMessage()
-        .withClientIdentifier('bblp_$serial')
+        .withClientIdentifier(clientId)
         .authenticateAs(username, accessCode)
         .startClean()
         .withWillQos(MqttQos.atMostOnce);
@@ -120,17 +135,14 @@ class BambuMqttClient {
     if (client.connectionStatus?.state == MqttConnectionState.connected) {
       _client = client;
 
-      // 先挂上消息监听，再订阅主题
-      client.updates!.listen(_onMessage);
+      // 先挂上消息监听（自动重连后 _onConnected 会重新监听，防止 stream 被替换）
+      _updatesSubscription?.cancel();
+      _updatesSubscription = client.updates!.listen(_onMessage);
 
-      // 订阅报告主题 — MQTT 保证先处理 subscribe 再处理后续 publish，不会漏收
-      client.subscribe(reportTopic, MqttQos.atLeastOnce);
-
-      // 订阅后立即请求打印机推送完整状态
-      // ⚠️ 注意：不能在 _onConnected 回调里做这些，因为那时 _client 还是 null
-      startPush();
-      pushAll();
-      _startWatchdog();
+      // subscribe 实际返回时 SUBACK 可能还没到，
+      // 命令移到 _onSubscribed 回调里发，确保订阅在 broker 端生效后再请求推送
+      _pendingInitialPush = true;
+      await client.subscribe(reportTopic, MqttQos.atLeastOnce);
 
       return true;
     } else {
@@ -142,7 +154,11 @@ class BambuMqttClient {
 
   /// 断开连接
   void disconnect() {
+    _pendingInitialPush = false;
+    _stopInitialDataTimer();
     _stopWatchdog();
+    _updatesSubscription?.cancel();
+    _updatesSubscription = null;
     _client?.disconnect();
     _client = null;
     // 清理状态缓存，确保重连时重新接收完整数据
@@ -182,31 +198,81 @@ class BambuMqttClient {
     _watchdogTimer = null;
   }
 
-  /// Watchdog 超时回调 - 重新请求推送
-  void _onWatchdogTimeout() {
-    _log('Watchdog 超时，重新请求推送状态');
-    if (!isConnected) {
-      _log('未连接，等待自动重连');
-      _startWatchdog();
+  /// 启动初始数据等待计时器
+  ///
+  /// 订阅后短时间（15秒）内未收到任何消息，重试 pushAll。
+  /// 最多重试 2 次，之后交给 watchdog 兜底。
+  void _startInitialDataTimer() {
+    _initialDataTimer?.cancel();
+    _initialDataRetries = 0;
+    _initialDataTimer = Timer(
+      const Duration(seconds: _initialDataTimeoutSeconds),
+      _onInitialDataTimeout,
+    );
+    _log('初始数据等待中 ($_initialDataTimeoutSeconds 秒)');
+  }
+
+  /// 取消初始数据等待计时器（收到消息时调用）
+  void _stopInitialDataTimer() {
+    _initialDataTimer?.cancel();
+    _initialDataTimer = null;
+    _initialDataRetries = 0;
+  }
+
+  /// 初始数据超时 — 重试 pushAll
+  void _onInitialDataTimeout() {
+    if (_initialDataRetries >= 2) {
+      _log('初始数据重试已达上限，等待下次 watchdog 重连');
       return;
     }
-    startPush();
+    _initialDataRetries++;
+    _log('初始数据超时，第 $_initialDataRetries 次重试 pushAll');
     pushAll();
-    // 重启计时器
-    _startWatchdog();
+    _initialDataTimer = Timer(
+      const Duration(seconds: _initialDataTimeoutSeconds),
+      _onInitialDataTimeout,
+    );
+  }
+
+  /// Watchdog 超时回调 — 断开并重建连接
+  ///
+  /// 如果只重发命令，连接挂死（打印机 MQTT session 卡住）时永远得不到回复。
+  /// 全量断线重连 → 新 CONNECT（clean session）→ 新 SUBSCRIBE → pushall，
+  /// 打印机侧也会建立新 session，恢复正常推送。
+  Future<void> _onWatchdogTimeout() async {
+    _log('Watchdog 超时，强制重连...');
+    _pendingInitialPush = false;
+    _stopInitialDataTimer();
+
+    // 全量断开 — 先禁用自动重连，避免旧客户端和新连接并发
+    _stopWatchdog();
+    if (_client != null) {
+      _client!.autoReconnect = false;
+      _client!.disconnect();
+    }
+    _client = null;
+    _data.clear();
+
+    // 重建连接（内部走 _onSubscribed → startPush + pushAll）
+    final ok = await connect();
+    if (!ok) {
+      _log('Watchdog 重连失败，60 秒后重试');
+      _startWatchdog();
+    }
   }
 
   // --- 回调 ---
 
-  void _onConnected() {
+  Future<void> _onConnected() async {
     _log('已连接到 MQTT 服务器');
-    // 自动重连路径：_client 已存在，重新订阅并请求推送
-    // （首次连接的 startPush/pushAll/watchdog 已在 connect() 中完成）
     if (_client != null && _client!.connectionStatus?.state == MqttConnectionState.connected) {
-      _client!.subscribe(reportTopic, MqttQos.atLeastOnce);
-      startPush();
-      pushAll();
-      _startWatchdog();
+      // 自动重连后重新监听 updates stream（mqtt_client 可能会替换 stream）
+      _updatesSubscription?.cancel();
+      _updatesSubscription = _client!.updates!.listen(_onMessage);
+
+      // 命令在 _onSubscribed 中统一发送，确保订阅生效后再请求推送
+      _pendingInitialPush = true;
+      await _client!.subscribe(reportTopic, MqttQos.atLeastOnce);
     }
   }
 
@@ -216,6 +282,16 @@ class BambuMqttClient {
 
   void _onSubscribed(String topic) {
     _log('已订阅: $topic');
+    // SUBACK 确认后，订阅已在 broker 生效，再发命令确保不丢失回复
+    if (_pendingInitialPush) {
+      _pendingInitialPush = false;
+      // 分开发送命令，不要合并到一条消息里。HA 组件也是分开发送的。
+      getInfoVersion();  // 先请求固件版本
+      pushAll();         // 再请求全量状态
+      // 如果打印机刚建立连接还未就绪，15 秒内未收到消息会重试 pushAll
+      _startInitialDataTimer();
+      _startWatchdog();
+    }
   }
 
   void _onAutoReconnect() {
@@ -223,14 +299,26 @@ class BambuMqttClient {
   }
 
   void _onMessage(List<MqttReceivedMessage<MqttMessage>> messages) {
-    // 收到消息时重置 watchdog
-    _resetWatchdog();
+    // 收到第一条消息后，取消初始数据等待计时器
+    _stopInitialDataTimer();
 
     for (final msg in messages) {
       final pubMsg = msg.payload as MqttPublishMessage;
-      final jsonStr = MqttPublishPayload.bytesToStringAsString(
-        pubMsg.payload.message,
-      );
+      final rawBytes = pubMsg.payload.message;
+
+      // 兼容非 UTF-8 编码：先试 UTF-8，失败则用 Latin-1 兜底（HA 组件同样策略）
+      String jsonStr;
+      try {
+        jsonStr = utf8.decode(rawBytes);
+      } catch (_) {
+        // UTF-8 解码失败（含 FormatException 和其他编码错误），用 Latin-1 逐字节保留
+        try {
+          jsonStr = latin1.decode(rawBytes);
+        } catch (_) {
+          _log('消息解码失败: 无法解析字节数据 [${msg.topic}]');
+          continue;
+        }
+      }
 
       _log('收到消息 [${msg.topic}]: $jsonStr');
 
@@ -238,6 +326,8 @@ class BambuMqttClient {
         final doc = json.decode(jsonStr) as Map<String, dynamic>;
         _mergeData(doc);
         _messageController.add(doc);
+        // 仅当消息成功解析后才重置 watchdog，避免无效数据续命
+        _resetWatchdog();
       } on FormatException catch (e) {
         _log('JSON 解析失败: $e');
       }
@@ -270,35 +360,45 @@ class BambuMqttClient {
     }
     final jsonStr = json.encode(payload);
     final builder = MqttClientPayloadBuilder()..addString(jsonStr);
-    client.publishMessage(
-      commandTopic,
-      MqttQos.atLeastOnce,
-      builder.payload!,
-    );
-    _log('已发送命令: $payload');
-    return true;
+    final bytes = builder.payload;
+    if (bytes == null) {
+      _log('命令序列化失败: payload builder 返回 null');
+      return false;
+    }
+    try {
+      client.publishMessage(
+        commandTopic,
+        MqttQos.atLeastOnce,
+        bytes,
+      );
+      _log('已发送命令: $jsonStr');
+      return true;
+    } catch (e) {
+      _log('发送命令失败: $e');
+      return false;
+    }
   }
 
   /// 请求全量状态推送
   /// 注意：P1 系列需要完整格式，否则可能不响应
+  /// 按协议要求加 sequence_id，且只发 pushall（get_version 分开单独发）
   bool pushAll() {
     return publishCommand({
-      'pushing': {'command': 'pushall'},
-      'info': {'command': 'get_version'},
+      'pushing': {'sequence_id': '0', 'command': 'pushall'},
     });
   }
 
-  /// 开始持续推送（用于 watchdog 超时后重新请求）
+  /// 开始持续推送（用于 watchdog 超时后重新请求，而不是断开重连）
   bool startPush() {
     return publishCommand({
-      'pushing': {'command': 'start'},
+      'pushing': {'sequence_id': '0', 'command': 'start'},
     });
   }
 
   /// 请求固件版本信息
   bool getInfoVersion() {
     return publishCommand({
-      'info': {'command': 'get_version'},
+      'info': {'sequence_id': '0', 'command': 'get_version'},
     });
   }
 
@@ -307,21 +407,21 @@ class BambuMqttClient {
   /// 停止打印
   bool stopPrint() {
     return publishCommand({
-      'print': {'command': 'stop'},
+      'print': {'sequence_id': '0', 'command': 'stop'},
     });
   }
 
   /// 暂停打印
   bool pausePrint() {
     return publishCommand({
-      'print': {'command': 'pause'},
+      'print': {'sequence_id': '0', 'command': 'pause'},
     });
   }
 
   /// 恢复打印
   bool resumePrint() {
     return publishCommand({
-      'print': {'command': 'resume'},
+      'print': {'sequence_id': '0', 'command': 'resume'},
     });
   }
 
@@ -357,6 +457,7 @@ class BambuMqttClient {
   bool skipObjects(List<int> objectList) {
     return publishCommand({
       'print': {
+        'sequence_id': '0',
         'command': 'skip_objects',
         'obj_list': objectList,
       },
@@ -366,21 +467,18 @@ class BambuMqttClient {
   // --- 灯光控制 ---
 
   /// 开灯
+  /// 注：不内联 pushAll，避免命令到达顺序颠倒。下次 watchdog push 会自动更新状态。
   bool turnLightOn() {
-    final ok = publishCommand({
-      'system': {'led_mode': 'on'},
+    return publishCommand({
+      'system': {'sequence_id': '0', 'command': 'ledctrl', 'led_node': 'chamber_light', 'led_mode': 'on', 'led_on_time': 500, 'led_off_time': 500, 'loop_times': 0, 'interval_time': 0},
     });
-    if (ok) pushAll();
-    return ok;
   }
 
   /// 关灯
   bool turnLightOff() {
-    final ok = publishCommand({
-      'system': {'led_mode': 'off'},
+    return publishCommand({
+      'system': {'sequence_id': '0', 'command': 'ledctrl', 'led_node': 'chamber_light', 'led_mode': 'off', 'led_on_time': 500, 'led_off_time': 500, 'loop_times': 0, 'interval_time': 0},
     });
-    if (ok) pushAll();
-    return ok;
   }
 
   // --- 温度控制 ---
@@ -450,6 +548,7 @@ class BambuMqttClient {
   bool setPrintSpeed(int level) {
     return publishCommand({
       'print': {
+        'sequence_id': '0',
         'command': 'print_speed',
         'param': '$level',
       },
@@ -474,6 +573,7 @@ class BambuMqttClient {
   bool loadFilament() {
     return publishCommand({
       'print': {
+        'sequence_id': '0',
         'command': 'ams_change_filament',
         'target': 255,
         'curr_temp': 215,
@@ -486,6 +586,7 @@ class BambuMqttClient {
   bool unloadFilament() {
     return publishCommand({
       'print': {
+        'sequence_id': '0',
         'command': 'ams_change_filament',
         'target': 254,
         'curr_temp': 215,
@@ -498,6 +599,7 @@ class BambuMqttClient {
   bool resumeFilamentAction() {
     return publishCommand({
       'print': {
+        'sequence_id': '0',
         'command': 'ams_control',
         'param': 'resume',
       },
@@ -537,6 +639,7 @@ class BambuMqttClient {
 
     return publishCommand({
       'print': {
+        'sequence_id': '0',
         'command': 'calibration',
         'option': bitmask,
       },
@@ -548,14 +651,14 @@ class BambuMqttClient {
   /// 请求访问码
   bool requestAccessCode() {
     return publishCommand({
-      'system': {'command': 'get_access_code'},
+      'system': {'sequence_id': '0', 'command': 'get_access_code'},
     });
   }
 
   /// 重启打印机
   bool reboot() {
     return publishCommand({
-      'system': {'command': 'reboot'},
+      'system': {'sequence_id': '0', 'command': 'reboot'},
     });
   }
 
@@ -578,6 +681,7 @@ class BambuMqttClient {
   bool setAutoStepRecovery({bool enabled = true}) {
     return publishCommand({
       'print': {
+        'sequence_id': '0',
         'command': 'gcode_line',
         'auto_recovery': enabled,
       },
@@ -588,6 +692,7 @@ class BambuMqttClient {
   bool setTimelapse({bool enabled = true}) {
     return publishCommand({
       'camera': {
+        'sequence_id': '0',
         'command': 'ipcam_record_set',
         'control': enabled ? 'enable' : 'disable',
       },

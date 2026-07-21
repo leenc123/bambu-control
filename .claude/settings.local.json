@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone *)",
+      "mcp__plugin_everything-claude-code_github__get_file_contents",
+      "mcp__plugin_everything-claude-code_github__search_repositories",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -sL \"https://api.github.com/repos/mitesh77/Best-Flutter-UI-Templates/contents/lib\")",
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(d['name']\\) for d in data]\")",
+      "Bash(curl -sL \"https://api.github.com/repos/mitesh77/Best-Flutter-UI-Templates/contents/lib?ref=master\")",
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(d['name'], d['type']\\) for d in data]\")",
+      "Bash(curl -sL \"https://api.github.com/repos/mitesh77/Best-Flutter-UI-Templates\")",
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); print\\(data.get\\('default_branch', 'N/A'\\)\\); print\\(data.get\\('description', 'N/A'\\)\\)\")",
+      "Bash(curl -sL \"https://api.github.com/repos/mitesh77/Best-Flutter-UI-Templates/contents/?ref=master\")",
+      "Bash(curl -sL \"https://api.github.com/repos/mitesh77/Best-Flutter-UI-Templates/contents/best_flutter_ui_templates/lib?ref=master\")",
+      "Bash(where flutter *)",
+      "Bash(flutter create *)",
+      "Bash(flutter pub *)",
+      "Bash(dart analyze *)",
+      "mcp__plugin_everything-claude-code_context7__resolve-library-id",
+      "mcp__plugin_everything-claude-code_context7__query-docs",
+      "Bash(dart run *)",
+      "Bash(dart pub *)",
+      "Bash(export PUB_HOSTED_URL=https://pub.flutter-io.cn)",
+      "Bash(export FLUTTER_STORAGE_BASE_URL=https://mirrors.tuna.tsinghua.edu.cn/flutter)",
+      "Bash(flutter analyze *)",
+      "mcp__plugin_everything-claude-code_exa__web_search_exa",
+      "mcp__plugin_everything-claude-code_github__search_code",
+      "mcp__plugin_everything-claude-code_exa__web_fetch_exa",
+      "WebFetch(domain:pub.dev)",
+      "Bash(awk *)",
+      "WebSearch",
+      "Bash(./gradlew compileDebugKotlin)"
+    ]
+  }
+}

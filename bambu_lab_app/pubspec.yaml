@@ -1,7 +1,7 @@
 name: bambu_lab_app
 description: "Bambu Lab 3D Printer Control App"
 publish_to: 'none'
-version: 1.0.0+1
+version: 0.0.1+1
 
 environment:
   sdk: ^3.9.2
@@ -24,6 +24,11 @@ dependencies:
   path: ^1.9.0
   # Navigation
   go_router: ^14.6.2
+  # Screen keep-on
+  wakelock_plus: ^1.2.8
+  # App version info
+  package_info_plus: ^8.1.2
+
   # UI
   google_fonts: ^6.2.1
   lucide_icons_flutter: ^3.1.14
@@ -31,6 +36,8 @@ dependencies:
   ftpconnect: ^2.0.10
   # File sharing
   share_plus: ^10.1.4
+  # ZIP archive handling (for .3mf thumbnail extraction)
+  archive: ^3.6.1
   best_flutter_ui_templates:
     path: ../Best-Flutter-UI-Templates/best_flutter_ui_templates
 

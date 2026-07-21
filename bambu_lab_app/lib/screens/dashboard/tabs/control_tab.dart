@@ -133,16 +133,16 @@ class _PressableButtonState extends State<_PressableButton> {
       onTapCancel: () => setState(() => _pressed = false),
       child: FlutterNeumorphism(
         style: NeumorphismStyle(
-          color: sel ? widget.c.accent.withValues(alpha: 0.15) : widget.c.background,
-          borderRadius: 10,
+          color: widget.c.background,
+          borderRadius: 12,
           depth: _pressed ? 2 : (sel ? 3 : 5),
           type: _pressed ? NeumorphismType.pressed : (sel ? NeumorphismType.pressed : NeumorphismType.flat),
         ),
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(widget.icon, size: 18, color: sel ? widget.c.accent : widget.c.textSecondary),
+          Icon(widget.icon, size: 18, color: sel ? widget.c.accent : widget.c.textSecondary.withValues(alpha: 0.5)),
           const SizedBox(height: 4),
-          Text(widget.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: sel ? widget.c.accent : widget.c.textSecondary)),
+          Text(widget.label, style: TextStyle(fontSize: 12, fontWeight: sel ? FontWeight.w600 : FontWeight.w400, color: sel ? widget.c.accent : widget.c.textSecondary)),
         ]),
       ),
     );
@@ -375,7 +375,7 @@ class _HomeButtonState extends State<_HomeButton> {
         margin: const EdgeInsets.symmetric(horizontal: 4),
         child: FlutterNeumorphism(
           style: NeumorphismStyle(
-            color: widget.c.accent.withValues(alpha: 0.12),
+            color: widget.c.background,
             borderRadius: 12,
             depth: _pressed ? 2 : 5,
             type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
@@ -573,11 +573,11 @@ class _CalibrationPanelState extends State<_CalibrationPanel> {
       ),
       padding: const EdgeInsets.all(12),
       child: Column(children: [
-        _Toggle(label: '热床调平', value: _bed, onChanged: (v) => setState(() => _bed = v), c: c),
+        _Toggle(icon: LucideIcons.layoutPanelTop, label: '热床调平', value: _bed, onChanged: (v) => setState(() => _bed = v), c: c),
         const SizedBox(height: 8),
-        _Toggle(label: '电机噪声', value: _motor, onChanged: (v) => setState(() => _motor = v), c: c),
+        _Toggle(icon: LucideIcons.audioLines, label: '电机噪声', value: _motor, onChanged: (v) => setState(() => _motor = v), c: c),
         const SizedBox(height: 8),
-        _Toggle(label: '振动补偿', value: _vib, onChanged: (v) => setState(() => _vib = v), c: c),
+        _Toggle(icon: LucideIcons.waves, label: '振动补偿', value: _vib, onChanged: (v) => setState(() => _vib = v), c: c),
         const SizedBox(height: 14),
         _StartButton(
           running: _running,
@@ -595,7 +595,8 @@ class _CalibrationPanelState extends State<_CalibrationPanel> {
 
 // ---- 开关按钮 ----
 class _Toggle extends StatefulWidget {
-  const _Toggle({required this.label, required this.value, required this.onChanged, required this.c});
+  const _Toggle({required this.icon, required this.label, required this.value, required this.onChanged, required this.c});
+  final IconData icon;
   final String label;
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -611,6 +612,8 @@ class _ToggleState extends State<_Toggle> {
   @override
   Widget build(BuildContext context) {
     return Row(children: [
+      Icon(widget.icon, size: 16, color: widget.c.accent.withValues(alpha: 0.7)),
+      const SizedBox(width: 6),
       Expanded(child: Text(widget.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: widget.c.textPrimary))),
       GestureDetector(
         onTapDown: (_) => setState(() => _pressed = true),
@@ -621,13 +624,13 @@ class _ToggleState extends State<_Toggle> {
         onTapCancel: () => setState(() => _pressed = false),
         child: FlutterNeumorphism(
           style: NeumorphismStyle(
-            color: widget.value ? widget.c.accent.withValues(alpha: 0.15) : widget.c.background,
-            borderRadius: 8,
+            color: widget.c.background,
+            borderRadius: 12,
             depth: _pressed ? 2 : (widget.value ? 3 : 5),
             type: _pressed ? NeumorphismType.pressed : (widget.value ? NeumorphismType.pressed : NeumorphismType.flat),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Text(widget.value ? '开' : '关', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: widget.value ? widget.c.accent : widget.c.textSecondary)),
+          child: Text(widget.value ? '开' : '关', style: TextStyle(fontSize: 12, fontWeight: widget.value ? FontWeight.w600 : FontWeight.w400, color: widget.value ? widget.c.accent : widget.c.textSecondary)),
         ),
       ),
     ]);
@@ -660,16 +663,16 @@ class _StartButtonState extends State<_StartButton> {
       onTapCancel: disabled ? null : () => setState(() => _pressed = false),
       child: FlutterNeumorphism(
         style: NeumorphismStyle(
-          color: widget.running ? widget.c.textSecondary.withValues(alpha: 0.12) : widget.c.accent.withValues(alpha: 0.12),
+          color: widget.c.background,
           borderRadius: 12,
           depth: _pressed ? 2 : 5,
           type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(widget.running ? LucideIcons.loader : LucideIcons.play, size: 18, color: widget.running ? widget.c.textSecondary : widget.c.accent),
+          Icon(widget.running ? LucideIcons.loader : LucideIcons.play, size: 18, color: widget.running ? widget.c.textSecondary.withValues(alpha: 0.5) : widget.c.accent),
           const SizedBox(width: 6),
-          Text(widget.running ? '校准中...' : '开始', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: widget.running ? widget.c.textSecondary : widget.c.accent)),
+          Text(widget.running ? '校准中...' : '开始', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: widget.running ? widget.c.textSecondary.withValues(alpha: 0.5) : widget.c.accent)),
         ]),
       ),
     );

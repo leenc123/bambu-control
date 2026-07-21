@@ -26,6 +26,8 @@ class PrinterState {
     this.firmwareVersion,
     this.serialNumber,
     this.printErrorCode,
+    this.gcodeFile,
+    this.subtaskName,
     this.online = false,
     this.hasAms = false,
   });
@@ -48,6 +50,8 @@ class PrinterState {
   final String? firmwareVersion;
   final String? serialNumber;
   final String? printErrorCode;
+  final String? gcodeFile;
+  final String? subtaskName;
   final bool online;
   final bool hasAms;
 
@@ -71,6 +75,8 @@ class PrinterState {
     String? firmwareVersion,
     String? serialNumber,
     String? printErrorCode,
+    String? gcodeFile,
+    String? subtaskName,
     bool? online,
     bool? hasAms,
   }) {
@@ -93,6 +99,8 @@ class PrinterState {
       firmwareVersion: firmwareVersion ?? this.firmwareVersion,
       serialNumber: serialNumber ?? this.serialNumber,
       printErrorCode: printErrorCode ?? this.printErrorCode,
+      gcodeFile: gcodeFile ?? this.gcodeFile,
+      subtaskName: subtaskName ?? this.subtaskName,
       online: online ?? this.online,
       hasAms: hasAms ?? this.hasAms,
     );
@@ -144,6 +152,8 @@ class PrinterState {
         wifiSignal: print.containsKey('wifi_signal') ? _parseWifiSignal(print['wifi_signal']) : null,
         printSpeed: print.containsKey('spd_lvl') ? _toInt(print['spd_lvl']) ?? base.printSpeed : null,
         printErrorCode: print.containsKey('print_error') ? print['print_error']?.toString() : null,
+        gcodeFile: print.containsKey('gcode_file') ? print['gcode_file']?.toString() : base.gcodeFile,
+        subtaskName: print.containsKey('subtask_name') ? print['subtask_name']?.toString() : base.subtaskName,
         online: true,
       );
     }

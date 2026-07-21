@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
 
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -25,10 +26,12 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<Offset> _titleSlide;
   late final Animation<double> _subFade;
   late final Animation<Offset> _subSlide;
+  String _version = '';
 
   @override
   void initState() {
     super.initState();
+    _loadVersion();
 
     // ---------- Lottie 控制器 ----------
     _lottieController = AnimationController(vsync: this);
@@ -86,6 +89,11 @@ class _SplashScreenState extends State<SplashScreen>
     _textController.forward();
   }
 
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) setState(() => _version = info.version);
+  }
+
   @override
   void dispose() {
     _lottieController.dispose();
@@ -98,59 +106,76 @@ class _SplashScreenState extends State<SplashScreen>
     final c = NeuoTheme.of(context);
     return Scaffold(
       backgroundColor: c.background,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ---- Logo 动画（小尺寸） ----
-            SizedBox(
-              width: 140,
-              height: 140,
-              child: Lottie.asset(
-                'assets/bambu control.json',
-                controller: _lottieController,
-                repeat: false,
-                onLoaded: (composition) {
-                  _lottieController.duration = composition.duration;
-                  _lottieController.forward();
-                },
-              ),
-            ),
-            const SizedBox(height: 40),
-            // ---- App 名称（动画结束后淡入） ----
-            SlideTransition(
-              position: _titleSlide,
-              child: FadeTransition(
-                opacity: _titleFade,
-                child: Text(
-                  'Bambu Lab',
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    color: c.textPrimary,
-                    letterSpacing: 1.5,
+      body: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ---- Logo 动画（小尺寸） ----
+                SizedBox(
+                  width: 140,
+                  height: 140,
+                  child: Lottie.asset(
+                    'assets/bambu control.json',
+                    controller: _lottieController,
+                    repeat: false,
+                    onLoaded: (composition) {
+                      _lottieController.duration = composition.duration;
+                      _lottieController.forward();
+                    },
                   ),
+                ),
+                const SizedBox(height: 40),
+                // ---- App 名称（动画结束后淡入） ----
+                SlideTransition(
+                  position: _titleSlide,
+                  child: FadeTransition(
+                    opacity: _titleFade,
+                    child: Text(
+                      'Bambu Lab',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        color: c.textPrimary,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SlideTransition(
+                  position: _subSlide,
+                  child: FadeTransition(
+                    opacity: _subFade,
+                    child: Text(
+                      '3D Printer Control',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: c.textSecondary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // ---- 版本号 ----
+          Positioned(
+            left: 0, right: 0, bottom: 32,
+            child: Center(
+              child: Text(
+                _version.isNotEmpty ? 'v$_version' : '',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: c.textSecondary.withValues(alpha: 0.4),
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            SlideTransition(
-              position: _subSlide,
-              child: FadeTransition(
-                opacity: _subFade,
-                child: Text(
-                  '3D Printer Control',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
-                    color: c.textSecondary,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

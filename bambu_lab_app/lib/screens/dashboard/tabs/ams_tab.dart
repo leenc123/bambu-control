@@ -295,7 +295,8 @@ class _ColorPicker extends StatelessWidget {
       title: const Text('选择颜色'),
       content: SizedBox(
         width: 280,
-        child: Wrap(
+        child: SingleChildScrollView(
+          child: Wrap(
           spacing: 8, runSpacing: 8,
           children: _colors.map((e) {
             final hex = e.$1;
@@ -319,6 +320,7 @@ class _ColorPicker extends StatelessWidget {
             );
           }).toList(),
         ),
+      ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(null), child: const Text('取消')),

@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'package:bambu_lab_app/providers/printer_provider.dart';
 import 'package:bambu_lab_app/utils/debug_log_viewer.dart';
-import 'package:bambu_lab_app/version.dart';
+import 'package:bambu_lab_app/app_version.dart';
 import 'package:bambu_lab_app/providers/theme_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 
@@ -30,12 +30,18 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 14),
           _section('应用', c),
           const SizedBox(height: 8),
-          _TileBtn(icon: LucideIcons.info, title: '关于', subtitle: 'Bambu Lab App v$appVersion', c: c, onTap: () => showAboutDialog(
-            context: context,
-            applicationName: 'Bambu Lab App',
-            applicationVersion: '1.0.0',
-            applicationLegalese: 'Powered by Flutter',
-          )),
+          FutureBuilder<String>(
+            future: getAppVersion(),
+            builder: (context, snapshot) {
+              final ver = snapshot.data ?? '...';
+              return _TileBtn(icon: LucideIcons.info, title: '关于', subtitle: 'Bambu Lab App v$ver', c: c, onTap: () => showAboutDialog(
+                context: context,
+                applicationName: 'Bambu Lab App',
+                applicationVersion: ver,
+                applicationLegalese: 'Powered by Flutter',
+              ));
+            },
+          ),
           const SizedBox(height: 6),
           _TileBtn(icon: LucideIcons.bug, title: '调试信息', subtitle: '查看连接和状态详情', c: c, onTap: () => showDebugLog(context)),
           const SizedBox(height: 14),
