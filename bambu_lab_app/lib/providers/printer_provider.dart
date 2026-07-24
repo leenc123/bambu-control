@@ -10,6 +10,7 @@ import 'package:bambu_lab_app/models/printer_state.dart';
 import 'package:bambu_lab_app/models/printer_type.dart';
 import 'package:bambu_lab_app/services/printer_ftp_service.dart';
 import 'package:bambu_lab_app/services/printer_service.dart';
+import 'package:bambu_lab_app/utils/debug_log.dart';
 
 /// 打印机连接状态枚举
 enum ConnectionStatus { disconnected, connecting, connected, error }
@@ -111,13 +112,14 @@ class PrinterProvider extends ChangeNotifier {
     try {
       final ok = await _ftp!.connect();
       if (ok && isConnected) {
+        DebugLog.i('FTP', '连接成功');
         // 连接成功后自动获取预览图片
         await fetchPreviewImage();
+      } else {
+        DebugLog.i('FTP', '连接失败: ${_ftp!.lastError ?? "未知错误"}');
       }
     } catch (e) {
-      // FTP 连接失败不影响主连接
-      // ignore: avoid_print
-      print('[FTP] 连接失败: $e');
+      DebugLog.i('FTP', '连接异常: $e');
     }
     notifyListeners();
   }
@@ -142,6 +144,7 @@ class PrinterProvider extends ChangeNotifier {
   Future<void> fetchPreviewImage() async {
     if (_ftp == null || !_ftp!.isConnected) {
       _previewError = 'FTP 未连接';
+      DebugLog.i('PREVIEW', 'FTP 未连接');
       notifyListeners();
       return;
     }
@@ -156,12 +159,24 @@ class PrinterProvider extends ChangeNotifier {
       // 优先从 .3mf 提取缩略图（需要 subtaskName）
       final subtaskName = _state.subtaskName;
       if (subtaskName != null && subtaskName.isNotEmpty) {
+        DebugLog.i('PREVIEW', '尝试从 .3mf 提取缩略图: $subtaskName');
         image = await _ftp!.fetchCoverImageFrom3mf(subtaskName);
+        if (image != null) {
+          DebugLog.i('PREVIEW', '.3mf 缩略图提取成功');
+        } else {
+          DebugLog.i('PREVIEW', '.3mf 缩略图提取失败: ${_ftp!.lastError}');
+        }
       }
 
       // fallback: 从 /image 目录获取摄像头快照
       if (image == null) {
+        DebugLog.i('PREVIEW', '回退到 /image 目录获取预览');
         image = await _ftp!.getLatestPreviewImage();
+        if (image != null) {
+          DebugLog.i('PREVIEW', '/image 预览获取成功');
+        } else {
+          DebugLog.i('PREVIEW', '/image 预览获取失败: ${_ftp!.lastError}');
+        }
       }
 
       if (image != null) {
@@ -172,9 +187,16 @@ class PrinterProvider extends ChangeNotifier {
       }
     } catch (e) {
       _previewError = '获取预览图片异常: $e';
+      DebugLog.i('PREVIEW', '预览异常: $e');
     }
 
     _loadingPreview = false;
+    notifyListeners();
+  }
+
+  /// 乐观更新状态并通知 UI
+  void _optimisticUpdate({bool? lightOn}) {
+    _state = _state.copyWith(lightOn: lightOn);
     notifyListeners();
   }
 
@@ -201,9 +223,27 @@ class PrinterProvider extends ChangeNotifier {
   Future<bool> stopPrint() async => _service?.stopPrint() ?? false;
   Future<bool> pausePrint() async => _service?.pausePrint() ?? false;
   Future<bool> resumePrint() async => _service?.resumePrint() ?? false;
-  Future<bool> turnLightOn() async => _service?.turnLightOn() ?? false;
-  Future<bool> turnLightOff() async => _service?.turnLightOff() ?? false;
-  Future<bool> toggleLight() async => _service?.toggleLight() ?? false;
+
+  /// 开灯（乐观更新：立即刷新 UI，不等打印机响应）
+  Future<bool> turnLightOn() async {
+    _optimisticUpdate(lightOn: true);
+    return _service?.turnLightOn() ?? false;
+  }
+
+  /// 关灯（乐观更新：立即刷新 UI，不等打印机响应）
+  Future<bool> turnLightOff() async {
+    _optimisticUpdate(lightOn: false);
+    return _service?.turnLightOff() ?? false;
+  }
+
+  /// 切换灯光（乐观更新：立即刷新 UI，不等打印机响应）
+  Future<bool> toggleLight() async {
+    // 先做乐观翻转
+    _optimisticUpdate(lightOn: !_state.lightOn);
+    // 再发命令（PrinterService 的内部状态不受本次翻转影响，仍能正确判断当前状态）
+    return _service?.toggleLight() ?? false;
+  }
+
   Future<bool> setBedTemperature(int t) async =>
       _service?.setBedTemperature(t) ?? false;
   Future<bool> setNozzleTemperature(int t) async =>

@@ -6,6 +6,8 @@ import 'dart:typed_data';
 import 'dart:convert';
 
 import 'package:archive/archive.dart';
+
+import 'package:bambu_lab_app/utils/debug_log.dart';
 import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -25,6 +27,16 @@ class FtpFile {
   }
 }
 
+/// 将 ftpconnect 库的日志桥接到 DebugLog
+class _DebugLogger extends Logger {
+  _DebugLogger() : super(isEnabled: true);
+
+  @override
+  void log(String pMessage) {
+    DebugLog.i('FTP', pMessage);
+  }
+}
+
 class PrinterFtpService {
   PrinterFtpService({required this.host, required this.accessCode, this.port = 990});
 
@@ -40,7 +52,9 @@ class PrinterFtpService {
   Future<bool> connect() async {
     try {
       _lastError = null;
-      // 启用日志输出以便调试
+      DebugLog.i('FTP', '--- 开始 FTP 连接 ---');
+      DebugLog.i('FTP', '目标: $host:$port, 用户: bblp, 安全模式: FTPS');
+
       _client = FTPConnect(
         host,
         user: 'bblp',
@@ -49,10 +63,12 @@ class PrinterFtpService {
         // 使用隐式 FTPS（端口 990，TLS 从连接开始）。不要用 ftpes（显式），
         // 那需要先明文连接再 AUTH TLS 升级，和打印机不兼容。
         securityType: SecurityType.ftps,
-        timeout: 30, // 增加超时时间
-        showLog: true, // 启用调试日志
+        timeout: 30,
+        // 用自定义 Logger 替代 showLog:true，将命令/响应写入 DebugLog
+        logger: _DebugLogger(),
       );
       final ok = await _client!.connect();
+      DebugLog.i('FTP', '--- FTP connect() 返回值: $ok ---');
       if (!ok) {
         _lastError = 'FTP连接返回失败';
         _client = null;
@@ -60,8 +76,7 @@ class PrinterFtpService {
       return ok;
     } catch (e) {
       _lastError = 'FTP连接异常: $e';
-      // ignore: avoid_print
-      print('[FTP] 连接失败: $e');
+      DebugLog.i('FTP', '连接失败: $e');
       _client = null;
       return false;
     }
@@ -86,8 +101,7 @@ class PrinterFtpService {
       )).toList();
     } catch (e) {
       _lastError = '列出目录失败: $e';
-      // ignore: avoid_print
-      print('[FTP] 列出目录失败 ($dir): $e');
+      DebugLog.i('FTP', '列出目录失败 ($dir): $e');
       return [];
     }
   }
@@ -128,10 +142,16 @@ class PrinterFtpService {
   /// 返回图片的字节数据，用于显示预览
   Future<Uint8List?> getLatestPreviewImage() async {
     if (_client == null) return null;
+    DebugLog.i('FTP', '--- getLatestPreviewImage 开始 ---');
     try {
       // 进入 /image 目录
-      await _client!.changeDirectory('/image');
+      DebugLog.i('FTP', 'CWD /image');
+      final cwdOk = await _client!.changeDirectory('/image');
+      DebugLog.i('FTP', 'CWD /image 结果: $cwdOk');
+
+      DebugLog.i('FTP', '开始 LIST /image 内容');
       final entries = await _client!.listDirectoryContent();
+      DebugLog.i('FTP', 'LIST 返回 ${entries.length} 个条目');
 
       // 过滤出 PNG 文件，按修改时间排序（最新的在前）
       final pngFiles = entries
@@ -158,11 +178,12 @@ class PrinterFtpService {
       if (!ok || !localFile.existsSync()) return null;
 
       // 读取并返回字节数据
+      DebugLog.i('FTP', '--- getLatestPreviewImage 结束(成功) ---');
       return localFile.readAsBytes();
     } catch (e) {
       _lastError = '获取预览图片失败: $e';
-      // ignore: avoid_print
-      print('[FTP] 获取预览图片失败: $e');
+      DebugLog.i('FTP', '获取预览图片失败: $e');
+      DebugLog.i('FTP', '--- getLatestPreviewImage 结束(失败) ---');
       return null;
     }
   }
@@ -247,13 +268,14 @@ class PrinterFtpService {
 
       final rawContent = pngEntry.content;
       if (rawContent is List<int>) {
+        DebugLog.i('FTP', '从 .3mf 提取缩略图成功');
         return Uint8List.fromList(rawContent);
       }
+      DebugLog.i('FTP', '从 .3mf 提取缩略图失败: content类型不是List<int>');
       return null;
     } catch (e) {
       _lastError = '从 .3mf 提取缩略图失败: $e';
-      // ignore: avoid_print
-      print('[FTP] 提取缩略图失败: $e');
+      DebugLog.i('FTP', '提取缩略图失败: $e');
       return null;
     }
   }

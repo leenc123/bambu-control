@@ -38,8 +38,6 @@ dependencies:
   share_plus: ^10.1.4
   # ZIP archive handling (for .3mf thumbnail extraction)
   archive: ^3.6.1
-  best_flutter_ui_templates:
-    path: ../Best-Flutter-UI-Templates/best_flutter_ui_templates
 
 dev_dependencies:
   flutter_test:
@@ -59,4 +57,4 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "D:\\python_project\\bambu-control\\bambu_lab_app\\bamboo_app_logo.png"
+  image_path: "bamboo_app_logo.png"

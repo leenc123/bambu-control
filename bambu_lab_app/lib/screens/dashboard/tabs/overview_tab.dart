@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_neumorphism_ui/flutter_neumorphism_ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'package:bambu_lab_app/models/gcode_state.dart';
 import 'package:bambu_lab_app/models/print_status.dart';
 import 'package:bambu_lab_app/providers/printer_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
@@ -34,7 +35,7 @@ class OverviewTab extends StatelessWidget {
             child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Expanded(flex: 3, child: _ThumbnailCard(printer: printer, c: c)),
               const SizedBox(width: 10),
-              Expanded(flex: 4, child: _TempsCard(s: s, c: c)),
+              Expanded(flex: 4, child: _TempsCard(s: s, c: c, printer: printer)),
             ]),
           ),
         ),
@@ -111,7 +112,7 @@ class _ThumbnailCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        // 文件名（左下角）
+        // 文件名
         SizedBox(
           width: double.infinity,
           child: Text(
@@ -168,14 +169,15 @@ class _ThumbnailCard extends StatelessWidget {
 
 // ===== 温度卡片（右侧三行）=====
 class _TempsCard extends StatelessWidget {
-  const _TempsCard({required this.s, required this.c});
+  const _TempsCard({required this.s, required this.c, required this.printer});
   final dynamic s;
   final NeuoColors c;
+  final PrinterProvider printer;
 
   @override
   Widget build(BuildContext context) {
-    // 根据打印机型号动态加载对应设备实物图，fallback 到通用示意图
-    final imageAsset = printerImageByType(s.printerType) ??
+    // 根据打印机型号 + 灯光状态动态加载对应设备实物图，fallback 到通用示意图
+    final imageAsset = printerImageByType(s.printerType, lightOn: s.lightOn) ??
         (c.background.computeLuminance() > 0.5
             ? 'assets/printer_images/devices.png'
             : 'assets/printer_images/devices-black.png');
@@ -221,10 +223,21 @@ class _TempsCard extends StatelessWidget {
               child: Container(
                 color: c.background.withValues(alpha: 0.35),
                 child: Stack(fit: StackFit.expand, children: [
-                  Center(
-                    child: Transform.scale(
-                      scale: 1.15,
-                      child: Image.asset(imageAsset, fit: BoxFit.contain),
+                  // 灯光切换时跨屏淡入淡出过渡
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 500),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: child,
+                    ),
+                    child: Center(
+                      key: ValueKey(imageAsset),
+                      child: Transform.scale(
+                        scale: 1.15,
+                        child: Image.asset(imageAsset, fit: BoxFit.contain),
+                      ),
                     ),
                   ),
                   // 热床 - 底部居中，右移 10px
@@ -255,6 +268,25 @@ class _TempsCard extends StatelessWidget {
                         child: _tempLabel(LucideIcons.home, s.chamberTemp, _green),
                       ),
                     ),
+                  // 灯光开关 - 右下角
+                  Positioned(
+                    bottom: 12, right: 12,
+                    child: GestureDetector(
+                      onTap: () => printer.toggleLight(),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          s.lightOn ? LucideIcons.sun : LucideIcons.lightbulb,
+                          size: 16,
+                          color: s.lightOn ? Colors.amber.shade300 : Colors.white.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ),
+                  ),
                 ]),
               ),
             ),
@@ -315,7 +347,8 @@ class _ProgressControlCard extends StatelessWidget {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: running ? c.accent : c.textSecondary),
               ),
               const SizedBox(width: 8),
-              Text(running ? '打印中' : '待机', style: TextStyle(fontSize: 13, color: c.textSecondary)),
+              // 显示当前阶段名（如"热床预热""首层检测"），替代固定的"打印中"
+              Text(running ? s.currentStageName : '待机', style: TextStyle(fontSize: 13, color: c.textSecondary)),
               const Spacer(),
               if (running) ...[
                 Icon(LucideIcons.clock, size: 13, color: c.textSecondary),

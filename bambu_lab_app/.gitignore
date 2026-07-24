@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Python virtual environment
+tools/venv/
+
+# Backup files
+*.bak
+
+# Build reports
+android/build/

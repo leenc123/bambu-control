@@ -30,6 +30,8 @@ class PrinterState {
     this.subtaskName,
     this.online = false,
     this.hasAms = false,
+    this.currentStageId = -1,
+    this.stageQueue = const [],
   });
 
   final PrintStatus printStatus;
@@ -55,6 +57,12 @@ class PrinterState {
   final bool online;
   final bool hasAms;
 
+  /// 当前打印阶段 ID（stg_cur）
+  final int currentStageId;
+
+  /// 阶段队列（stg 数组）
+  final List<int> stageQueue;
+
   /// 创建更新后的新实例（不可变模式）
   PrinterState copyWith({
     PrintStatus? printStatus,
@@ -79,6 +87,8 @@ class PrinterState {
     String? subtaskName,
     bool? online,
     bool? hasAms,
+    int? currentStageId,
+    List<int>? stageQueue,
   }) {
     return PrinterState(
       printStatus: printStatus ?? this.printStatus,
@@ -103,6 +113,8 @@ class PrinterState {
       subtaskName: subtaskName ?? this.subtaskName,
       online: online ?? this.online,
       hasAms: hasAms ?? this.hasAms,
+      currentStageId: currentStageId ?? this.currentStageId,
+      stageQueue: stageQueue ?? this.stageQueue,
     );
   }
 
@@ -154,6 +166,8 @@ class PrinterState {
         printErrorCode: print.containsKey('print_error') ? print['print_error']?.toString() : null,
         gcodeFile: print.containsKey('gcode_file') ? print['gcode_file']?.toString() : base.gcodeFile,
         subtaskName: print.containsKey('subtask_name') ? print['subtask_name']?.toString() : base.subtaskName,
+        currentStageId: print.containsKey('stg_cur') ? _toInt(print['stg_cur']) ?? -1 : base.currentStageId,
+        stageQueue: print.containsKey('stg') ? _parseStageQueue(print['stg']) : base.stageQueue,
         online: true,
       );
     }
@@ -309,4 +323,66 @@ class PrinterState {
     }
     return const AMSHub();
   }
+
+  /// 解析阶段队列（stg 数组）
+  static List<int> _parseStageQueue(dynamic value) {
+    if (value is List) {
+      return value.map((e) {
+        if (e is int) return e;
+        if (e is double) return e.toInt();
+        return int.tryParse(e.toString()) ?? -1;
+      }).toList();
+    }
+    return [];
+  }
+
+  /// 阶段 ID → 中文名称对照表（源自 HA 组件 CURRENT_STAGE_IDS）
+  static const stageNames = <int, String>{
+    0: '打印中',
+    1: '自动调平',
+    2: '热床预热',
+    3: '振动补偿',
+    4: '换料中',
+    5: 'M400 暂停',
+    6: '耗材用完暂停',
+    7: '加热喷嘴',
+    8: '挤出校准',
+    9: '扫描热床表面',
+    10: '首层检测',
+    11: '识别热床类型',
+    12: '校准 micro lidar',
+    13: '归零',
+    14: '清洁喷嘴',
+    15: '检查挤出头温度',
+    16: '用户暂停',
+    17: '前盖掉落暂停',
+    18: '校准 micro lidar',
+    19: '流量校准',
+    20: '喷嘴温度异常暂停',
+    21: '热床温度异常暂停',
+    22: '退料中',
+    23: '丢步暂停',
+    24: '进料中',
+    25: '电机噪声校准',
+    26: 'AMS 丢失暂停',
+    27: '散热风扇低速暂停',
+    28: '箱温控制错误暂停',
+    29: '箱体降温',
+    30: '用户 G-code 暂停',
+    31: '电机噪声展示',
+    32: '喷嘴包裹检测暂停',
+    33: '切刀错误暂停',
+    34: '首层错误暂停',
+    35: '喷嘴堵塞暂停',
+    49: '箱体加热',
+    50: '热床降温',
+    51: '打印校准线',
+    52: '检查材料',
+    64: '准备喷嘴',
+    -1: '空闲',
+    255: '空闲',
+  };
+
+  /// 获取当前阶段的中文名称
+  String get currentStageName => stageNames[currentStageId] ?? '未知($currentStageId)';
 }
