@@ -24,8 +24,9 @@ dependencies:
   path: ^1.9.0
   # Navigation
   go_router: ^14.6.2
-  # Screen keep-on
-  wakelock_plus: ^1.2.8
+  # Screen keep-on (local plugin — Android/iOS only)
+  wakelock:
+    path: plugins/wakelock
   # App version info
   package_info_plus: ^8.1.2
 
@@ -33,7 +34,9 @@ dependencies:
   google_fonts: ^6.2.1
   lucide_icons_flutter: ^3.1.14
   flutter_neumorphism_ui: ^1.0.2
-  ftpconnect: ^2.0.10
+  ftpconnect:
+    git:
+      url: https://github.com/leenc123/dartFTP.git
   # File sharing
   share_plus: ^10.1.4
   # ZIP archive handling (for .3mf thumbnail extraction)

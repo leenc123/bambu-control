@@ -1,7 +1,7 @@
 /// AMS 耗材管理 - 显示 AMSHub 中每个 AMS 单元的耗材信息
 library;
 
-import 'package:best_flutter_ui_templates/fitness_app/fitness_app_theme.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -80,11 +80,11 @@ class _AmsUnitCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: FitnessAppTheme.white,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: FitnessAppTheme.grey.withValues(alpha: 0.2),
+              color: Color(0xFF3A5160).withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -98,7 +98,7 @@ class _AmsUnitCard extends StatelessWidget {
               children: [
                 Icon(
                   Icons.inventory_2,
-                  color: FitnessAppTheme.nearlyDarkBlue,
+                  color: Color(0xFF2633C5),
                   size: 24,
                 ),
                 const SizedBox(width: 8),
@@ -107,7 +107,7 @@ class _AmsUnitCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: FitnessAppTheme.darkText,
+                    color: Color(0xFF253840),
                   ),
                 ),
               ],
@@ -142,7 +142,7 @@ class _AmsUnitCard extends StatelessWidget {
                   '无耗材信息',
                   style: TextStyle(
                     fontSize: 14,
-                    color: FitnessAppTheme.grey,
+                    color: Color(0xFF3A5160),
                   ),
                 ),
               )
@@ -205,7 +205,7 @@ class _InfoChip extends StatelessWidget {
                     label,
                     style: TextStyle(
                       fontSize: 11,
-                      color: FitnessAppTheme.grey,
+                      color: Color(0xFF3A5160),
                     ),
                   ),
                   Text(
@@ -241,7 +241,7 @@ class _FilamentTrayTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: FitnessAppTheme.nearlyWhite,
+        color: Color(0xFFFAFAFA),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -252,11 +252,11 @@ class _FilamentTrayTile extends StatelessWidget {
             height: 32,
             decoration: BoxDecoration(
               color: hasFilament
-                  ? (trayColor ?? FitnessAppTheme.grey)
-                  : FitnessAppTheme.nearlyWhite,
+                  ? (trayColor ?? Color(0xFF3A5160))
+                  : Color(0xFFFAFAFA),
               shape: BoxShape.circle,
               border: Border.all(
-                color: FitnessAppTheme.grey.withValues(alpha: 0.3),
+                color: Color(0xFF3A5160).withValues(alpha: 0.3),
                 width: 1.5,
               ),
             ),
@@ -275,7 +275,7 @@ class _FilamentTrayTile extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: FitnessAppTheme.nearlyDarkBlue,
+                        color: Color(0xFF2633C5),
                       ),
                     ),
                     if (tray.trayType.isNotEmpty) ...[
@@ -285,7 +285,7 @@ class _FilamentTrayTile extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: FitnessAppTheme.darkText,
+                          color: Color(0xFF253840),
                         ),
                       ),
                     ],
@@ -296,7 +296,7 @@ class _FilamentTrayTile extends StatelessWidget {
                     tray.traySubBrands,
                     style: TextStyle(
                       fontSize: 11,
-                      color: FitnessAppTheme.grey,
+                      color: Color(0xFF3A5160),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -310,7 +310,7 @@ class _FilamentTrayTile extends StatelessWidget {
               '${tray.nozzleTempMin}-${tray.nozzleTempMax}°C',
               style: TextStyle(
                 fontSize: 11,
-                color: FitnessAppTheme.grey,
+                color: Color(0xFF3A5160),
               ),
             ),
         ],
@@ -359,7 +359,7 @@ class _NoAmsView extends StatelessWidget {
             '请确保 AMS 已连接打印机',
             style: TextStyle(
               fontSize: 14,
-              color: FitnessAppTheme.grey,
+              color: Color(0xFF3A5160),
             ),
           ),
         ],
@@ -389,13 +389,13 @@ class _NavButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: FitnessAppTheme.nearlyDarkBlue),
+            Icon(icon, color: Color(0xFF2633C5)),
             const SizedBox(height: 4),
             Text(
               label,
               style: const TextStyle(
                 fontSize: 12,
-                color: FitnessAppTheme.nearlyDarkBlue,
+                color: Color(0xFF2633C5),
               ),
             ),
           ],

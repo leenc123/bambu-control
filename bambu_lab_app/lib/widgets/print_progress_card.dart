@@ -1,7 +1,7 @@
 /// 打印进度卡片 - 渐变背景显示打印状态和进度
 library;
 
-import 'package:best_flutter_ui_templates/fitness_app/fitness_app_theme.dart';
+
 import 'package:flutter/material.dart';
 
 import 'package:bambu_lab_app/models/print_status.dart';
@@ -26,7 +26,7 @@ class PrintProgressCard extends StatelessWidget {
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              FitnessAppTheme.nearlyDarkBlue,
+              Color(0xFF2633C5),
               Color(0xFF6F56E8),
             ],
             begin: Alignment.topLeft,
@@ -55,20 +55,20 @@ class PrintProgressCard extends StatelessWidget {
               Text(
                 '打印任务',
                 style: TextStyle(
-                  fontFamily: FitnessAppTheme.fontName,
+                  fontFamily: 'Roboto',
                   fontWeight: FontWeight.normal,
                   fontSize: 14,
-                  color: FitnessAppTheme.white,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 printStatus.displayName,
                 style: TextStyle(
-                  fontFamily: FitnessAppTheme.fontName,
+                  fontFamily: 'Roboto',
                   fontWeight: FontWeight.bold,
                   fontSize: 24,
-                  color: FitnessAppTheme.white,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 32),
@@ -77,45 +77,45 @@ class PrintProgressCard extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.timer,
-                    color: FitnessAppTheme.white,
+                    color: Colors.white,
                     size: 16,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     remainingTime,
                     style: TextStyle(
-                      fontFamily: FitnessAppTheme.fontName,
+                      fontFamily: 'Roboto',
                       fontWeight: FontWeight.w500,
                       fontSize: 14,
-                      color: FitnessAppTheme.white,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(width: 16),
                   if (printPercentage != null) ...[
                     Icon(
                       Icons.percent,
-                      color: FitnessAppTheme.white,
+                      color: Colors.white,
                       size: 16,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '$printPercentage%',
                       style: TextStyle(
-                        fontFamily: FitnessAppTheme.fontName,
+                        fontFamily: 'Roboto',
                         fontWeight: FontWeight.w500,
                         fontSize: 14,
-                        color: FitnessAppTheme.white,
+                        color: Colors.white,
                       ),
                     ),
                   ],
                   const Spacer(),
                   Container(
                     decoration: BoxDecoration(
-                      color: FitnessAppTheme.nearlyWhite,
+                      color: Color(0xFFFAFAFA),
                       shape: BoxShape.circle,
                       boxShadow: <BoxShadow>[
                         BoxShadow(
-                          color: FitnessAppTheme.nearlyBlack.withValues(alpha:0.4),
+                          color: Color(0xFF213333).withValues(alpha:0.4),
                           offset: const Offset(8.0, 8.0),
                           blurRadius: 8.0,
                         ),
@@ -136,9 +136,9 @@ class PrintProgressCard extends StatelessWidget {
                 const SizedBox(height: 16),
                 LinearProgressIndicator(
                   value: printPercentage! / 100.0,
-                  backgroundColor: FitnessAppTheme.white.withValues(alpha:0.3),
+                  backgroundColor: Colors.white.withValues(alpha:0.3),
                   valueColor:
-                      const AlwaysStoppedAnimation<Color>(FitnessAppTheme.white),
+                      const AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               ],
             ],

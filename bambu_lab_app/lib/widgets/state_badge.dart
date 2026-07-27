@@ -1,7 +1,7 @@
 /// 状态徽章 - 显示状态标签和值
 library;
 
-import 'package:best_flutter_ui_templates/fitness_app/fitness_app_theme.dart';
+
 import 'package:flutter/material.dart';
 
 class StateBadge extends StatelessWidget {
@@ -22,11 +22,11 @@ class StateBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: FitnessAppTheme.white,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: FitnessAppTheme.grey.withValues(alpha: 0.2),
+              color: Color(0xFF3A5160).withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -40,14 +40,14 @@ class StateBadge extends StatelessWidget {
                 Icon(
                   icon,
                   size: 16,
-                  color: FitnessAppTheme.nearlyDarkBlue,
+                  color: Color(0xFF2633C5),
                 ),
                 const SizedBox(width: 4),
                 Text(
                   label,
                   style: TextStyle(
                     fontSize: 12,
-                    color: FitnessAppTheme.grey,
+                    color: Color(0xFF3A5160),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -59,7 +59,7 @@ class StateBadge extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: FitnessAppTheme.darkText,
+                color: Color(0xFF253840),
               ),
               overflow: TextOverflow.ellipsis,
             ),

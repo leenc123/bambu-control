@@ -1,7 +1,6 @@
 /// 高级打印控制 - G-code 终端、速度、温度、归位
 library;
 
-import 'package:best_flutter_ui_templates/fitness_app/fitness_app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -111,11 +110,11 @@ class _SpeedSelector extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FitnessAppTheme.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: FitnessAppTheme.grey.withValues(alpha: 0.2),
+            color: Color(0xFF3A5160).withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -133,11 +132,11 @@ class _SpeedSelector extends StatelessWidget {
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isSelected
-                      ? FitnessAppTheme.nearlyDarkBlue
-                      : FitnessAppTheme.nearlyWhite,
+                      ? Color(0xFF2633C5)
+                      : Color(0xFFFAFAFA),
                   foregroundColor: isSelected
-                      ? FitnessAppTheme.white
-                      : FitnessAppTheme.darkText,
+                      ? Colors.white
+                      : Color(0xFF253840),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -189,11 +188,11 @@ class _TemperatureInputsState extends State<_TemperatureInputs> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FitnessAppTheme.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: FitnessAppTheme.grey.withValues(alpha: 0.2),
+            color: Color(0xFF3A5160).withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -249,7 +248,7 @@ class _TempInputRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: FitnessAppTheme.nearlyDarkBlue, size: 24),
+        Icon(icon, color: Color(0xFF2633C5), size: 24),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -257,7 +256,7 @@ class _TempInputRow extends StatelessWidget {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: FitnessAppTheme.darkText,
+              color: Color(0xFF253840),
             ),
           ),
         ),
@@ -271,7 +270,7 @@ class _TempInputRow extends StatelessWidget {
               hintText: hint,
               hintStyle: const TextStyle(fontSize: 14),
               filled: true,
-              fillColor: FitnessAppTheme.nearlyWhite,
+              fillColor: Color(0xFFFAFAFA),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
@@ -297,7 +296,7 @@ class _TempInputRow extends StatelessWidget {
             }
           },
           icon: const Icon(Icons.check_circle, size: 28),
-          color: FitnessAppTheme.nearlyDarkBlue,
+          color: Color(0xFF2633C5),
         ),
       ],
     );
@@ -314,11 +313,11 @@ class _ActionButtons extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FitnessAppTheme.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: FitnessAppTheme.grey.withValues(alpha: 0.2),
+            color: Color(0xFF3A5160).withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -330,7 +329,7 @@ class _ActionButtons extends StatelessWidget {
             child: _ActionButton(
               label: '自动归位',
               icon: Icons.home_work,
-              color: FitnessAppTheme.nearlyDarkBlue,
+              color: Color(0xFF2633C5),
               onTap: () async {
                 await printer.autoHome();
               },
@@ -421,11 +420,11 @@ class _GcodeTerminalState extends State<_GcodeTerminal> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FitnessAppTheme.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: FitnessAppTheme.grey.withValues(alpha: 0.2),
+            color: Color(0xFF3A5160).withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -439,7 +438,7 @@ class _GcodeTerminalState extends State<_GcodeTerminal> {
             Container(
               constraints: const BoxConstraints(maxHeight: 200),
               decoration: BoxDecoration(
-                color: FitnessAppTheme.nearlyWhite,
+                color: Color(0xFFFAFAFA),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ListView.builder(
@@ -456,7 +455,7 @@ class _GcodeTerminalState extends State<_GcodeTerminal> {
                         fontFamily: 'monospace',
                         fontSize: 13,
                         color: entry.success
-                            ? FitnessAppTheme.darkText
+                            ? Color(0xFF253840)
                             : Colors.red,
                       ),
                     ),
@@ -475,7 +474,7 @@ class _GcodeTerminalState extends State<_GcodeTerminal> {
                   decoration: InputDecoration(
                     hintText: '输入 G-code (如 G28)',
                     filled: true,
-                    fillColor: FitnessAppTheme.nearlyWhite,
+                    fillColor: Color(0xFFFAFAFA),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide.none,
@@ -537,22 +536,22 @@ class _SectionHeader extends StatelessWidget {
             child: Text(
               title,
               style: TextStyle(
-                fontFamily: FitnessAppTheme.fontName,
+                fontFamily: 'Roboto',
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
                 letterSpacing: 0.5,
-                color: FitnessAppTheme.lightText,
+                color: Color(0xFF4A6572),
               ),
             ),
           ),
           Text(
             subtitle,
             style: TextStyle(
-              fontFamily: FitnessAppTheme.fontName,
+              fontFamily: 'Roboto',
               fontWeight: FontWeight.normal,
               fontSize: 16,
               letterSpacing: 0.5,
-              color: FitnessAppTheme.nearlyDarkBlue,
+              color: Color(0xFF2633C5),
             ),
           ),
         ],
@@ -583,13 +582,13 @@ class _NavButton extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: FitnessAppTheme.nearlyDarkBlue, size: 22),
+              Icon(icon, color: Color(0xFF2633C5), size: 22),
               const SizedBox(height: 2),
               Text(
                 label,
                 style: const TextStyle(
                   fontSize: 11,
-                  color: FitnessAppTheme.nearlyDarkBlue,
+                  color: Color(0xFF2633C5),
                 ),
               ),
             ],

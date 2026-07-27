@@ -1,7 +1,7 @@
 /// 灯光开关组件
 library;
 
-import 'package:best_flutter_ui_templates/fitness_app/fitness_app_theme.dart';
+
 import 'package:flutter/material.dart';
 
 import 'package:bambu_lab_app/providers/printer_provider.dart';
@@ -21,11 +21,11 @@ class LightToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FitnessAppTheme.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: FitnessAppTheme.grey.withValues(alpha:0.2),
+            color: Color(0xFF3A5160).withValues(alpha:0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -35,7 +35,7 @@ class LightToggle extends StatelessWidget {
         children: [
           Icon(
             isOn ? Icons.lightbulb : Icons.lightbulb_outline,
-            color: isOn ? Colors.amber : FitnessAppTheme.grey,
+            color: isOn ? Colors.amber : Color(0xFF3A5160),
             size: 32,
           ),
           const SizedBox(width: 16),
@@ -48,7 +48,7 @@ class LightToggle extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: FitnessAppTheme.darkText,
+                    color: Color(0xFF253840),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -56,7 +56,7 @@ class LightToggle extends StatelessWidget {
                   isOn ? '已开启' : '已关闭',
                   style: TextStyle(
                     fontSize: 14,
-                    color: FitnessAppTheme.grey,
+                    color: Color(0xFF3A5160),
                   ),
                 ),
               ],
@@ -67,7 +67,7 @@ class LightToggle extends StatelessWidget {
             onChanged: (value) async {
               await printer.toggleLight();
             },
-            activeThumbColor: FitnessAppTheme.nearlyDarkBlue,
+            activeThumbColor: Color(0xFF2633C5),
           ),
         ],
       ),

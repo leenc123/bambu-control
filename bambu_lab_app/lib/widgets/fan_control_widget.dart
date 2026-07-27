@@ -1,7 +1,7 @@
 /// 风扇控制组件 - 滑块调节风扇速度
 library;
 
-import 'package:best_flutter_ui_templates/fitness_app/fitness_app_theme.dart';
+
 import 'package:flutter/material.dart';
 
 import 'package:bambu_lab_app/providers/printer_provider.dart';
@@ -47,11 +47,11 @@ class _FanControlWidgetState extends State<FanControlWidget> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FitnessAppTheme.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: FitnessAppTheme.grey.withValues(alpha:0.2),
+            color: Color(0xFF3A5160).withValues(alpha:0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -112,7 +112,7 @@ class _FanSlider extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: FitnessAppTheme.darkText,
+                color: Color(0xFF253840),
               ),
             ),
             Text(
@@ -120,7 +120,7 @@ class _FanSlider extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: FitnessAppTheme.nearlyDarkBlue,
+                color: Color(0xFF2633C5),
               ),
             ),
           ],
@@ -130,7 +130,7 @@ class _FanSlider extends StatelessWidget {
           min: 0,
           max: 100,
           divisions: 100,
-          activeColor: FitnessAppTheme.nearlyDarkBlue,
+          activeColor: Color(0xFF2633C5),
           onChanged: onChanged,
           onChangeEnd: onChangeEnd,
         ),

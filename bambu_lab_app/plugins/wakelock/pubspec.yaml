@@ -1,0 +1,20 @@
+name: wakelock
+description: "Keep screen on — Android/iOS only, no linux/windows native code"
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.example.wakelock
+        pluginClass: WakelockPlugin
+      ios:
+        pluginClass: WakelockPlugin

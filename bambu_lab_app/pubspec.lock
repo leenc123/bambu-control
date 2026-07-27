@@ -17,14 +17,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "10.0.1"
-  animations:
-    dependency: transitive
-    description:
-      name: animations
-      sha256: "9cb469212ea51be27097f23b519d594c01171721347b55df9334fff653659e7f"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "2.2.0"
   archive:
     dependency: "direct main"
     description:
@@ -49,13 +41,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.13.1"
-  best_flutter_ui_templates:
-    dependency: "direct main"
-    description:
-      path: "../Best-Flutter-UI-Templates/best_flutter_ui_templates"
-      relative: true
-    source: path
-    version: "1.0.0+1"
   boolean_selector:
     dependency: transitive
     description:
@@ -208,14 +193,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "3.1.5"
-  dbus:
-    dependency: transitive
-    description:
-      name: dbus
-      sha256: "0ce9b0a839e6dee59a37a623d2fc26a35bbbe6404213e419b0d6411023d62645"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "0.7.14"
   drift:
     dependency: "direct main"
     description:
@@ -301,14 +278,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.0.2"
-  flutter_rating_bar:
-    dependency: transitive
-    description:
-      name: flutter_rating_bar
-      sha256: d2af03469eac832c591a1eba47c91ecc871fe5708e69967073c043b2d775ed93
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "4.0.1"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -319,22 +288,15 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  font_awesome_flutter:
-    dependency: transitive
-    description:
-      name: font_awesome_flutter
-      sha256: b9011df3a1fa02993630b8fb83526368cf2206a711259830325bab2f1d2a4eb0
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "10.12.0"
   ftpconnect:
     dependency: "direct main"
     description:
-      name: ftpconnect
-      sha256: a9ebac24a50b17dc9a1101fff85c3729fd8c16ec41346b0fa6e549616e23b2f6
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "2.0.10"
+      path: "."
+      ref: HEAD
+      resolved-ref: "91babd5b7a0515e907ebfb4defc5bb3735b87f58"
+      url: "https://github.com/leenc123/dartFTP.git"
+    source: git
+    version: "2.0.9"
   glob:
     dependency: transitive
     description:
@@ -900,22 +862,13 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "15.2.0"
-  wakelock_plus:
+  wakelock:
     dependency: "direct main"
     description:
-      name: wakelock_plus
-      sha256: "61713aa82b7f85c21c9f4cd0a148abd75f38a74ec645fcb1e446f882c82fd09b"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "1.3.3"
-  wakelock_plus_platform_interface:
-    dependency: transitive
-    description:
-      name: wakelock_plus_platform_interface
-      sha256: b13f99e992e7ae6a152e16c5559d3c07ff445b13330192662494e614ca3e7d7b
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "1.5.1"
+      path: "plugins/wakelock"
+      relative: true
+    source: path
+    version: "0.0.1"
   watcher:
     dependency: transitive
     description:
