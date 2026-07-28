@@ -34,9 +34,6 @@ dependencies:
   google_fonts: ^6.2.1
   lucide_icons_flutter: ^3.1.14
   flutter_neumorphism_ui: ^1.0.2
-  ftpconnect:
-    git:
-      url: https://github.com/leenc123/dartFTP.git
   # File sharing
   share_plus: ^10.1.4
   # ZIP archive handling (for .3mf thumbnail extraction)

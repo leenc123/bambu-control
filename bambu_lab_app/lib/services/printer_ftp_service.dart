@@ -1,4 +1,7 @@
 /// FTP 文件管理服务
+///
+/// 底层使用 [ImplicitFTPSClient]（非 ftpconnect），
+/// 修复了响应读取竞态、数据通道 TLS 加密等问题。
 library;
 
 import 'dart:io';
@@ -6,9 +9,8 @@ import 'dart:typed_data';
 import 'dart:convert';
 
 import 'package:archive/archive.dart';
-
+import 'package:bambu_lab_app/services/ftp_client.dart';
 import 'package:bambu_lab_app/utils/debug_log.dart';
-import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path_provider/path_provider.dart';
 
 class FtpFile {
@@ -18,7 +20,13 @@ class FtpFile {
   final int size;
   final DateTime? modified;
 
-  const FtpFile({required this.name, required this.path, this.isDir = false, this.size = 0, this.modified});
+  const FtpFile({
+    required this.name,
+    required this.path,
+    this.isDir = false,
+    this.size = 0,
+    this.modified,
+  });
 
   String get sizeDisplay {
     if (size < 1024) return '$size B';
@@ -27,53 +35,40 @@ class FtpFile {
   }
 }
 
-/// 将 ftpconnect 库的日志桥接到 DebugLog
-class _DebugLogger extends Logger {
-  _DebugLogger() : super(isEnabled: true);
-
-  @override
-  void log(String pMessage) {
-    DebugLog.i('FTP', pMessage);
-  }
-}
-
 class PrinterFtpService {
-  PrinterFtpService({required this.host, required this.accessCode, this.port = 990});
+  PrinterFtpService({
+    required this.host,
+    required this.accessCode,
+    this.port = 990,
+  });
 
   final String host;
   final int port;
   final String accessCode;
-  FTPConnect? _client;
+  ImplicitFTPSClient? _client;
   String? _lastError;
 
-  bool get isConnected => _client != null;
+  bool get isConnected => _client?.isConnected ?? false;
   String? get lastError => _lastError;
 
   Future<bool> connect() async {
     try {
       _lastError = null;
       DebugLog.i('FTP', '--- 开始 FTP 连接 ---');
-      DebugLog.i('FTP', '目标: $host:$port, 用户: bblp, 安全模式: FTPS');
+      DebugLog.i('FTP', '目标: $host:$port, 用户: bblp');
 
-      _client = FTPConnect(
-        host,
-        user: 'bblp',
-        pass: accessCode,
+      final ftp = ImplicitFTPSClient(
+        host: host,
         port: port,
-        // 使用隐式 FTPS（端口 990，TLS 从连接开始）。不要用 ftpes（显式），
-        // 那需要先明文连接再 AUTH TLS 升级，和打印机不兼容。
-        securityType: SecurityType.ftps,
-        timeout: 30,
-        // 用自定义 Logger 替代 showLog:true，将命令/响应写入 DebugLog
-        logger: _DebugLogger(),
+        user: 'bblp',
+        password: accessCode,
       );
-      final ok = await _client!.connect();
-      DebugLog.i('FTP', '--- FTP connect() 返回值: $ok ---');
-      if (!ok) {
-        _lastError = 'FTP连接返回失败';
-        _client = null;
-      }
-      return ok;
+
+      await ftp.connect();
+      _client = ftp;
+
+      DebugLog.i('FTP', '--- FTP 连接成功 ---');
+      return true;
     } catch (e) {
       _lastError = 'FTP连接异常: $e';
       DebugLog.i('FTP', '连接失败: $e');
@@ -83,22 +78,21 @@ class PrinterFtpService {
   }
 
   Future<void> disconnect() async {
-    await _client?.disconnect();
+    await _client?.quit();
     _client = null;
   }
 
   Future<List<FtpFile>> listDirectory([String dir = '/']) async {
     if (_client == null) return [];
     try {
-      await _client!.changeDirectory(dir);
-      final entries = await _client!.listDirectoryContent();
+      final entries = await _client!.list(dir);
       return entries.map((e) => FtpFile(
-        name: e.name,
-        path: '$dir/${e.name}'.replaceAll('//', '/'),
-        isDir: e.type == FTPEntryType.dir,
-        size: e.size ?? 0,
-        modified: e.modifyTime,
-      )).toList();
+            name: e.name,
+            path: '$dir/${e.name}'.replaceAll('//', '/'),
+            isDir: e.isDir,
+            size: e.size ?? 0,
+            modified: e.modifyTime,
+          )).toList();
     } catch (e) {
       _lastError = '列出目录失败: $e';
       DebugLog.i('FTP', '列出目录失败 ($dir): $e');
@@ -111,27 +105,30 @@ class PrinterFtpService {
   Future<List<FtpFile>> listTimelapse() async => listDirectory('/timelapse');
 
   Future<bool> uploadFile(File file, String remoteName) async {
-    try {
-      return await _client?.uploadFile(file, sRemoteName: remoteName) ?? false;
-    } catch (e) {
-      _lastError = '上传失败: $e';
-      return false;
-    }
+    // 暂不支持上传 — 需要 STOR 命令实现
+    _lastError = '上传暂不支持';
+    return false;
   }
 
   Future<bool> downloadFile(String remotePath, File localFile) async {
+    if (_client == null) return false;
     try {
-      return await _client?.downloadFile(remotePath, localFile) ?? false;
+      DebugLog.i('FTP', '下载文件: $remotePath');
+      await _client!.downloadFile(remotePath, localFile);
+      DebugLog.i('FTP', '下载完成: $remotePath');
+      return true;
     } catch (e) {
       _lastError = '下载失败: $e';
+      DebugLog.i('FTP', '下载失败: $e');
       return false;
     }
   }
 
   Future<bool> deleteFile(String path) async {
+    if (_client == null) return false;
     try {
-      final name = path.split('/').last;
-      return await _client?.deleteFile(name) ?? false;
+      await _client!.delete(path);
+      return true;
     } catch (e) {
       _lastError = '删除失败: $e';
       return false;
@@ -144,23 +141,19 @@ class PrinterFtpService {
     if (_client == null) return null;
     DebugLog.i('FTP', '--- getLatestPreviewImage 开始 ---');
     try {
-      // 进入 /image 目录
-      DebugLog.i('FTP', 'CWD /image');
-      final cwdOk = await _client!.changeDirectory('/image');
-      DebugLog.i('FTP', 'CWD /image 结果: $cwdOk');
-
-      DebugLog.i('FTP', '开始 LIST /image 内容');
-      final entries = await _client!.listDirectoryContent();
-      DebugLog.i('FTP', 'LIST 返回 ${entries.length} 个条目');
+      final entries = await _client!.list('/image');
+      DebugLog.i('FTP', 'LIST /image 返回 ${entries.length} 个条目');
 
       // 过滤出 PNG 文件，按修改时间排序（最新的在前）
       final pngFiles = entries
-          .where((e) => e.name.toLowerCase().endsWith('.png') && e.type != FTPEntryType.dir)
+          .where((e) => e.name.toLowerCase().endsWith('.png') && !e.isDir)
           .toList();
 
-      if (pngFiles.isEmpty) return null;
+      if (pngFiles.isEmpty) {
+        DebugLog.i('FTP', '/image 目录无 PNG 文件');
+        return null;
+      }
 
-      // 按修改时间排序，获取最新的
       pngFiles.sort((a, b) {
         final aTime = a.modifyTime ?? DateTime(1970);
         final bTime = b.modifyTime ?? DateTime(1970);
@@ -168,16 +161,12 @@ class PrinterFtpService {
       });
 
       final latestFile = pngFiles.first;
-
-      // 下载到临时目录
       final tempDir = await getTemporaryDirectory();
       final localFile = File('${tempDir.path}/preview_${latestFile.name}');
 
-      // 下载文件
-      final ok = await _client!.downloadFile(latestFile.name, localFile);
-      if (!ok || !localFile.existsSync()) return null;
+      await _client!.downloadFile('/image/${latestFile.name}', localFile);
+      if (!localFile.existsSync()) return null;
 
-      // 读取并返回字节数据
       DebugLog.i('FTP', '--- getLatestPreviewImage 结束(成功) ---');
       return localFile.readAsBytes();
     } catch (e) {
@@ -202,27 +191,35 @@ class PrinterFtpService {
         if (!subtaskName.endsWith('.3mf')) '$subtaskName.gcode.3mf',
       ];
 
+      DebugLog.i('FTP', '搜索 .3mf 文件，候选: $candidates');
+
       // 2. 在 /cache 目录下查找匹配的 .3mf 文件
-      await _client!.changeDirectory('/cache');
-      final entries = await _client!.listDirectoryContent();
-      final modelEntry = entries.cast<FTPEntry?>().firstWhere(
-        (e) => e != null && e.type != FTPEntryType.dir && candidates.any((c) => e.name == c),
-        orElse: () => null,
-      );
+      final entries = await _client!.list('/cache');
+      final modelEntry = entries.cast<FtpEntry?>().firstWhere(
+            (e) =>
+                e != null &&
+                !e.isDir &&
+                candidates.any((c) => e.name == c),
+            orElse: () => null,
+          );
 
       if (modelEntry == null) {
         _lastError = '未在 /cache 找到匹配的 .3mf 文件';
+        DebugLog.i('FTP', _lastError!);
         return null;
       }
+
+      DebugLog.i('FTP', '找到 .3mf 文件: ${modelEntry.name}');
 
       // 3. 下载 .3mf 文件到临时目录
       final tempDir = await getTemporaryDirectory();
       final localFile = File('${tempDir.path}/${modelEntry.name}');
 
       // 如果临时文件已存在且大小匹配，跳过下载
-      if (!localFile.existsSync() || localFile.lengthSync() != (modelEntry.size ?? 0)) {
-        final ok = await _client!.downloadFile(modelEntry.name, localFile);
-        if (!ok || !localFile.existsSync()) {
+      if (!localFile.existsSync() ||
+          localFile.lengthSync() != (modelEntry.size ?? 0)) {
+        await _client!.downloadFile('/cache/${modelEntry.name}', localFile);
+        if (!localFile.existsSync()) {
           _lastError = '下载 .3mf 文件失败';
           return null;
         }
@@ -246,12 +243,15 @@ class PrinterFtpService {
       }
 
       final configXml = utf8.decode(configEntry.content as List<int>);
-      final plateMatch = RegExp(r'key="index"\s+value="(\d+)"').firstMatch(configXml);
+      final plateMatch =
+          RegExp(r'key="index"\s+value="(\d+)"').firstMatch(configXml);
       final plateNum = plateMatch?.group(1);
       if (plateNum == null) {
         _lastError = '未能在 slice_info.config 中找到 plate 编号';
         return null;
       }
+
+      DebugLog.i('FTP', '提取 plate $plateNum 缩略图');
 
       // 6. 读取 Metadata/plate_{plateNum}.png
       ArchiveFile? pngEntry;
