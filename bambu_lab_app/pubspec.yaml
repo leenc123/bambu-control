@@ -17,9 +17,8 @@ dependencies:
   provider: ^6.1.2
   # MQTT communication
   mqtt_client: ^10.6.0
-  # Database (SQLite)
+  # Database (SQLite) — sqlite3 3.x 通过 build hooks 自动打包所有平台
   drift: ^2.22.1
-  sqlite3_flutter_libs: ^0.5.28
   path_provider: ^2.1.5
   path: ^1.9.0
   # Navigation
