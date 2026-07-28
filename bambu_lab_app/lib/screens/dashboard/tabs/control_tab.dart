@@ -283,19 +283,19 @@ class _Actions extends StatelessWidget {
       Column(mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
           const SizedBox(width: 38),
-          _DirButton(icon: LucideIcons.chevronUp, onPressed: () => printer.sendGcode('G91\nG1 Y-10 F3000\nG90'), c: c),
+          _DirButton(icon: LucideIcons.chevronUp, onPressed: () => printer.sendGcode('M211 S\nM211 X1 Y1 Z1\nM1002 push_ref_mode\nG91\nG1 Y-10.0 F3000\nM1002 pop_ref_mode\nM211 R\nG90'), c: c),
           const SizedBox(width: 38),
         ]),
         const SizedBox(height: 4),
         Row(children: [
-          _DirButton(icon: LucideIcons.chevronLeft, onPressed: () => printer.sendGcode('G91\nG1 X-10 F3000\nG90'), c: c),
+          _DirButton(icon: LucideIcons.chevronLeft, onPressed: () => printer.sendGcode('M211 S\nM211 X1 Y1 Z1\nM1002 push_ref_mode\nG91\nG1 X-10.0 F3000\nM1002 pop_ref_mode\nM211 R\nG90'), c: c),
           _HomeButton(onPressed: () => printer.autoHome(), c: c),
-          _DirButton(icon: LucideIcons.chevronRight, onPressed: () => printer.sendGcode('G91\nG1 X10 F3000\nG90'), c: c),
+          _DirButton(icon: LucideIcons.chevronRight, onPressed: () => printer.sendGcode('M211 S\nM211 X1 Y1 Z1\nM1002 push_ref_mode\nG91\nG1 X10.0 F3000\nM1002 pop_ref_mode\nM211 R\nG90'), c: c),
         ]),
         const SizedBox(height: 4),
         Row(children: [
           const SizedBox(width: 38),
-          _DirButton(icon: LucideIcons.chevronDown, onPressed: () => printer.sendGcode('G91\nG1 Y10 F3000\nG90'), c: c),
+          _DirButton(icon: LucideIcons.chevronDown, onPressed: () => printer.sendGcode('M211 S\nM211 X1 Y1 Z1\nM1002 push_ref_mode\nG91\nG1 Y10.0 F3000\nM1002 pop_ref_mode\nM211 R\nG90'), c: c),
           const SizedBox(width: 38),
         ]),
       ]),
@@ -304,9 +304,9 @@ class _Actions extends StatelessWidget {
       Column(mainAxisSize: MainAxisSize.min, children: [
         Text('Z轴', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c.textSecondary)),
         const SizedBox(height: 6),
-        _ZButton(label: '升高', icon: LucideIcons.chevronUp, onPressed: () => printer.sendGcode('G91\nG1 Z5 F300\nG90'), c: c),
+        _ZButton(label: '升高', icon: LucideIcons.chevronUp, onPressed: () => printer.sendGcode('M211 S\nM211 X1 Y1 Z1\nM1002 push_ref_mode\nG91\nG1 Z5.0 F300\nM1002 pop_ref_mode\nM211 R\nG90'), c: c),
         const SizedBox(height: 6),
-        _ZButton(label: '降低', icon: LucideIcons.chevronDown, onPressed: () => printer.sendGcode('G91\nG1 Z-5 F300\nG90'), c: c),
+        _ZButton(label: '降低', icon: LucideIcons.chevronDown, onPressed: () => printer.sendGcode('M211 S\nM211 X1 Y1 Z1\nM1002 push_ref_mode\nG91\nG1 Z-5.0 F300\nM1002 pop_ref_mode\nM211 R\nG90'), c: c),
       ]),
     ]),
   );

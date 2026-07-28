@@ -68,7 +68,29 @@ glxinfo | grep "OpenGL renderer"   # 不应显示 llvmpipe（软件渲染）
 
 ## 3. 开发机构建
 
-### 3.1 依赖配置
+### 3.1 前置条件
+
+- Flutter SDK ≥ 3.x
+- **Android SDK command-line tools**（`flutter build bundle --debug` 需要它处理 native assets）
+
+安装 Android SDK（最小化）：
+
+```bash
+sudo apt-get install -y openjdk-17-jdk
+cd /opt
+wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+mkdir -p android-sdk/cmdline-tools
+unzip commandlinetools-linux-11076708_latest.zip -d android-sdk/cmdline-tools
+mv android-sdk/cmdline-tools/cmdline-tools android-sdk/cmdline-tools/latest
+export ANDROID_HOME=/opt/android-sdk
+export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+yes | sdkmanager --licenses
+sdkmanager "platforms;android-34" "build-tools;34.0.0"
+echo 'export ANDROID_HOME=/opt/android-sdk' >> ~/.bashrc
+echo 'export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH' >> ~/.bashrc
+```
+
+### 3.2 依赖配置
 
 `pubspec.yaml` 关键配置：
 
@@ -83,7 +105,7 @@ dependency_overrides:
   drift_dev: ">=2.22.0 <2.32.0"
 ```
 
-### 3.2 构建步骤
+### 3.3 构建步骤
 
 ```bash
 cd bambu_lab_app
@@ -92,11 +114,15 @@ cd bambu_lab_app
 flutter clean
 flutter pub get
 
-# debug 模式构建 Linux（生成 kernel_blob.bin）
-flutter build linux --debug
+# 构建 bundle（推荐方式，需 Android SDK）
+flutter build bundle --debug
+
+# 备用：flutter build linux --debug（产物在 build/linux/x64/debug/bundle/data/）
 ```
 
-### 3.3 构建产物位置
+产物在 `build/flutter_assets/`（或 `build/linux/x64/debug/bundle/data/flutter_assets/`）。
+
+### 3.4 构建产物位置
 
 ```
 build/linux/x64/debug/bundle/
@@ -266,7 +292,45 @@ Lottie.asset(
 )
 ```
 
-### 6.3 退出后显示器黑屏
+### 6.3 中文乱码
+
+Flutter 默认使用 Roboto 字体，不含中文字形。系统安装的字体对 Flutter 无效，必须打包进 app。
+
+**解决**：
+
+1. 下载中文字体（如 Noto Sans SC）放入 `assets/fonts/`：
+
+```bash
+mkdir -p assets/fonts
+wget -O assets/fonts/NotoSansSC-Regular.ttf \
+  "https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+```
+
+2. `pubspec.yaml` 注册字体：
+
+```yaml
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: NotoSansSC
+      fonts:
+        - asset: assets/fonts/NotoSansSC-Regular.ttf
+```
+
+3. `app.dart` 主题设默认字体：
+
+```dart
+theme: ThemeData(
+  fontFamily: 'NotoSansSC',
+  // ...
+),
+darkTheme: ThemeData(
+  fontFamily: 'NotoSansSC',
+  // ...
+),
+```
+
+### 6.4 退出后显示器黑屏
 
 flutter-pi 进程退出后 DRM 未释放。切换 tty：
 
