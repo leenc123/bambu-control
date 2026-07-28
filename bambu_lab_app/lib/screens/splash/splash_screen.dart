@@ -113,6 +113,7 @@ class _SplashScreenState extends State<SplashScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 // ---- Logo 动画（小尺寸） ----
+                // flutter-pi 下 Lottie 可能解码失败，降级为静态 logo
                 SizedBox(
                   width: 140,
                   height: 140,
@@ -120,6 +121,11 @@ class _SplashScreenState extends State<SplashScreen>
                     'assets/bambu_control.json',
                     controller: _lottieController,
                     repeat: false,
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'bamboo_app_logo.png',
+                      width: 140,
+                      height: 140,
+                    ),
                     onLoaded: (composition) {
                       _lottieController.duration = composition.duration;
                       _lottieController.forward();
