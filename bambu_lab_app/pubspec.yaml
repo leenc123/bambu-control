@@ -55,6 +55,10 @@ dependency_overrides:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: NotoSansSC
+      fonts:
+        - asset: assets/fonts/NotoSansSC-Regular.ttf
   assets:
     - assets/printer_images/
     - assets/bambu_control.json

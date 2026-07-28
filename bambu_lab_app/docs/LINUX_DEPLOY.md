@@ -2,18 +2,28 @@
 
 ## 概述
 
-本指南覆盖将 Bambu Lab App 编译并部署到 ARM Linux 服务器（树莓派等），通过 **flutter-pi** 作为 Flutter 引擎运行时。
+本指南覆盖将 Bambu Lab App 通过 **flutter-pi** 编译部署到 Linux x86_64 服务器（VMware 虚拟机 / 物理机）的完整流程。
 
-> **注意**：flutter-pi 是为嵌入式 Linux（树莓派等）设计的 Flutter 引擎 embedder，直接通过 DRM/KMS 渲染，不依赖 X11/Wayland。这意味着它**不支持标准 Flutter Linux 插件系统**，需要额外处理原生库依赖。
+> **注意**：flutter-pi 通过 DRM/KMS 直刷帧缓冲，不依赖 X11/Wayland。需要 GPU 驱动（`/dev/dri/card0` 存在），VMware 虚拟机需勾选 **「加速 3D 图形」**。
 
 ---
 
-## 1. 目标服务器环境准备
+## 1. 版本兼容性总览
 
-### 1.1 系统依赖
+| 组件 | 版本约束 | 原因 |
+| --- | --- | --- |
+| `sqlite3` | `^2.9.0` | 3.x 的 native assets 与 flutter-pi 不兼容 |
+| `drift` | `>=2.22.0 <2.32.0` | 2.32.0+ 强制要求 sqlite3 3.x |
+| `drift_dev` | `>=2.22.0 <2.32.0` | 与 drift 版本一致 |
+| `sqlite3_flutter_libs` | `^0.5.28` | Android/iOS/Windows 提供 .so；Linux 上由系统 libsqlite3 提供 |
+
+---
+
+## 2. 目标服务器环境准备
+
+### 2.1 系统依赖
 
 ```bash
-# Debian / Ubuntu / Raspberry Pi OS
 sudo apt-get update
 sudo apt-get install -y \
   libsqlite3-0 \
@@ -26,118 +36,287 @@ sudo apt-get install -y \
   libudev1
 ```
 
-| 包名 | 用途 |
-| --- | --- |
-| `libsqlite3-0` | SQLite 原生库（drift 数据库依赖） |
-| `libdrm2` / `libgbm1` | 图形缓冲管理 |
-| `libegl1-mesa` / `libgles2-mesa` | OpenGL ES 渲染 |
-| `libinput10` | 输入设备处理 |
-| `libxkbcommon0` | 键盘映射 |
-| `libudev1` | 设备管理 |
-
-### 1.2 安装 flutter-pi
+### 2.2 安装 flutter-pi
 
 ```bash
-# 从 GitHub releases 下载预编译二进制（推荐）
-# 根据目标架构选择 armv7（32位）或 arm64（64位）
-ARCH=$(dpkg --print-architecture)  # armhf 或 arm64
-
-# arm64 示例：
-wget https://github.com/ardera/flutter-pi/releases/latest/download/flutter-pi_linux-aarch64.tar.gz
-tar xzf flutter-pi_linux-aarch64.tar.gz
+# 源码编译（推荐，确保架构匹配）
+git clone https://github.com/ardera/flutter-pi.git /opt/flutter-pi
+cd /opt/flutter-pi
+mkdir build && cd build
+cmake .. && make -j$(nproc)
 sudo cp flutter-pi /usr/local/bin/
-
-# 或者从源码编译
-# git clone https://github.com/ardera/flutter-pi.git
-# cd flutter-pi && mkdir build && cd build
-# cmake .. && make -j$(nproc)
-# sudo cp flutter-pi /usr/local/bin/
 ```
 
-### 1.3 用户权限
-
-flutter-pi 需要访问 DRM 和输入设备：
+### 2.3 用户权限
 
 ```bash
-# 将运行用户加入必要组
 sudo usermod -aG video,input,render $USER
 # 重新登录生效
 ```
 
----
-
-## 2. 开发机编译 Flutter 应用
-
-### 2.1 前提条件
-
-- Flutter SDK ≥ 3.x（开发机上）
-- 目标架构的交叉编译工具链
-
-### 2.2 添加 Linux 平台支持（如果还没有）
+### 2.4 确认 GPU 可用
 
 ```bash
-cd bambu_lab_app
-flutter create --platforms=linux .
+ls /dev/dri/          # 应有 card0, renderD128
+sudo apt-get install mesa-utils
+glxinfo | grep "OpenGL renderer"   # 不应显示 llvmpipe（软件渲染）
 ```
 
-### 2.3 编译 ARM64 版本
-
-```bash
-cd bambu_lab_app
-
-# ARM64（树莓派 3B+/4/5，64 位系统）
-flutter build linux --target-platform linux-arm64
-
-# ARMv7（树莓派 2/3，32 位系统）
-flutter build linux --target-platform linux-arm
-```
-
-编译产物在 `build/linux/arm64/release/bundle/`（或 `arm/release/bundle/`）。
-
-### 2.4 编译产物结构
-
-```
-build/linux/arm64/release/bundle/
-├── bambu_lab_app          # 应用二进制
-├── data/
-│   ├── flutter_assets/    # Flutter 资源
-│   └── icudtl.dat         # ICU 数据
-└── lib/
-    ├── libflutter_engine.so
-    ├── libflutter_linux_gtk.so  # flutter-pi 下不需要
-    └── ...
-```
+> VMware 虚拟机需在设置 → 显示器 → 勾选 **「加速 3D 图形」**，否则软件渲染可能导致 Lottie 等组件失败。
 
 ---
 
-## 3. 部署到目标服务器
+## 3. 开发机构建
 
-### 3.1 传输文件
+### 3.1 依赖配置
+
+`pubspec.yaml` 关键配置：
+
+```yaml
+dependencies:
+  drift: ^2.22.1
+  sqlite3_flutter_libs: ^0.5.28
+
+dependency_overrides:
+  sqlite3: ^2.9.0
+  drift: ">=2.22.0 <2.32.0"
+  drift_dev: ">=2.22.0 <2.32.0"
+```
+
+### 3.2 构建步骤
+
+```bash
+cd bambu_lab_app
+
+# 清理 + 获取依赖
+flutter clean
+flutter pub get
+
+# debug 模式构建 Linux（生成 kernel_blob.bin）
+flutter build linux --debug
+```
+
+### 3.3 构建产物位置
+
+```
+build/linux/x64/debug/bundle/
+├── bambu_lab_app                    # GTK 可执行文件（flutter-pi 不用）
+└── data/
+    ├── flutter_assets/              # → 传到目标服务器
+    │   ├── AssetManifest.bin
+    │   ├── kernel_blob.bin          # Dart 代码快照
+    │   ├── assets/                  # pubspec.yaml 声明的资源
+    │   ├── fonts/
+    │   ├── packages/
+    │   └── ...
+    └── icudtl.dat                   # → 传到目标服务器
+```
+
+---
+
+## 4. 部署到目标服务器
+
+### 4.1 目标服务器目录结构
+
+> **关键**：flutter-pi 的 bundle 根目录即资源根目录。`flutter_assets/` 内的文件需**平铺到 bundle 根目录**，不能嵌套。
+
+flutter-pi 要求的布局：
+
+```
+/opt/bambu-control/
+├── kernel_blob.bin           # Dart 代码快照
+├── icudtl.dat                # ICU 数据
+├── libflutter_engine.so      # Flutter 引擎（debug 版）
+├── AssetManifest.bin         # ← 从 flutter_assets/ 移出
+├── FontManifest.json         # ← 从 flutter_assets/ 移出
+├── version.json              # ← 从 flutter_assets/ 移出
+├── NOTICES.Z                 # ← 从 flutter_assets/ 移出
+├── assets/                   # ← 从 flutter_assets/ 移出
+│   └── bambu_control.json    # 注意：文件名不能有空格
+├── fonts/                    # ← 从 flutter_assets/ 移出
+├── packages/                 # ← 从 flutter_assets/ 移出
+└── shaders/                  # ← 从 flutter_assets/ 移出
+```
+
+### 4.2 传输文件并平铺
 
 ```bash
 # 从开发机传到目标服务器
-rsync -avz build/linux/arm64/release/bundle/ \
-  user@target-server:/home/user/bambu_lab_app/
 
-# 或者用 scp
-scp -r build/linux/arm64/release/bundle/* \
-  user@target-server:/home/user/bambu_lab_app/
+# 方式 A：用 flutter build linux --debug
+scp build/linux/x64/debug/bundle/data/flutter_assets/kernel_blob.bin \
+  root@debian-cli:/opt/bambu-control/
+scp build/linux/x64/debug/bundle/data/icudtl.dat \
+  root@debian-cli:/opt/bambu-control/
+scp -r build/linux/x64/debug/bundle/data/flutter_assets/ \
+  root@debian-cli:/opt/bambu-control/
+
+# 方式 B（推荐）：用 flutter build bundle --debug（需 Android SDK）
+flutter build bundle --debug
+scp build/flutter_assets/kernel_blob.bin root@debian-cli:/opt/bambu-control/
+scp -r build/flutter_assets/ root@debian-cli:/opt/bambu-control/
 ```
 
-### 3.2 运行
+然后在目标服务器上，把 `flutter_assets/` 内的文件**平铺到 bundle 根目录**：
 
 ```bash
-# 在目标服务器上
-cd /home/user/bambu_lab_app
+# 在目标服务器（debian-cli）上
+cd /opt/bambu-control
 
-# 直接运行（需要显示器连接）
-flutter-pi --release bambu_lab_app
+# 清掉旧目录（如果之前嵌套的还在）
+rm -rf assets fonts packages shaders
 
-# 指定像素比（高 DPI 屏幕）
-flutter-pi --release --pixel_ratio=2 bambu_lab_app
+# 将 flutter_assets 内容平铺出来
+cp -r flutter_assets/* .
+
+# 验证结构
+ls -la
+# 应看到 kernel_blob.bin、icudtl.dat、AssetManifest.bin、assets/、fonts/ 等都在同一层
 ```
 
-### 3.3 配置 systemd 自启动（可选）
+### 4.3 获取 libflutter_engine.so
+
+> Flutter 3.x 不再独立分发 `libflutter_engine.so`，引擎内嵌在 `libflutter_linux_gtk.so` 中。flutter-pi 需要独立的引擎文件。
+
+在目标服务器上：
+
+```bash
+# 如果之前编译 flutter-pi 时产生了引擎（通常在 /usr/local/lib/）
+cp /usr/local/lib/libflutter_engine.so /opt/bambu-control/
+
+# 或者从 flutter-embedded-linux 获取
+# https://github.com/sony/flutter-embedded-linux/releases
+```
+
+### 4.4 运行
+
+```bash
+cd /opt/bambu-control
+pkill flutter-pi            # 停掉旧进程
+flutter-pi /opt/bambu-control
+```
+
+---
+
+## 5. SQLite 数据库说明
+
+### 5.1 为什么需要特殊处理
+
+flutter-pi **不支持标准 Flutter 插件系统**，`sqlite3_flutter_libs` 插件无法注册。因此：
+
+- 目标服务器必须装系统级 `libsqlite3-0`
+- `database.dart` 中 Linux 平台手动 `open.overrideFor` 指向系统库
+
+### 5.2 代码改动
+
+`lib/db/database.dart`：
+
+```dart
+import 'dart:ffi';
+import 'package:sqlite3/open.dart';
+
+static QueryExecutor _openConnection() {
+  // flutter-pi 无插件系统，Linux 下手动指定系统 sqlite3 库
+  if (Platform.isLinux) {
+    try {
+      open.overrideFor(
+        OperatingSystem.linux,
+        () => DynamicLibrary.open('libsqlite3.so.0'),
+      );
+    } catch (_) {
+      open.overrideFor(
+        OperatingSystem.linux,
+        () => DynamicLibrary.open('libsqlite3.so'),
+      );
+    }
+  }
+
+  return LazyDatabase(() async {
+    final docsDir = await getApplicationDocumentsDirectory();
+    final file = File(p.join(docsDir.path, 'bambu_lab_app.sqlite'));
+    return NativeDatabase.createInBackground(file);
+  });
+}
+```
+
+### 5.3 数据库文件位置
+
+`$HOME/.local/share/bambu_lab_app/bambu_lab_app.sqlite`
+
+---
+
+## 6. 已知问题与处理
+
+### 6.1 Asset 文件名不能有空格
+
+Flutter 打包时会将空格编码为 `%20`，导致运行时找不到文件。
+
+- ❌ `assets/bambu control.json`
+- ✅ `assets/bambu_control.json`
+
+### 6.2 Lottie 在软件渲染下可能失败
+
+flutter-pi 在 llvmpipe（软件渲染）下 Lottie 动画解码可能失败。已添加降级处理：
+
+```dart
+Lottie.asset(
+  'assets/bambu_control.json',
+  errorBuilder: (_, __, ___) => Image.asset('bamboo_app_logo.png'),
+  ...
+)
+```
+
+### 6.3 退出后显示器黑屏
+
+flutter-pi 进程退出后 DRM 未释放。切换 tty：
+
+```
+Ctrl + Alt + F2
+```
+
+---
+
+## 7. 故障排查
+
+### 7.1 sqlite3 相关错误
+
+```bash
+# 确认系统包已安装
+dpkg -l | grep libsqlite3-0
+
+# 确认 .so 存在
+find /usr/lib -name "libsqlite3*"
+```
+
+### 7.2 flutter-pi 报 "failed to open DRM device"
+
+```bash
+groups $USER              # 确认在 video 组
+ls -la /dev/dri/          # 确认 DRM 设备存在
+```
+
+### 7.3 asset 找不到
+
+```bash
+# 检查文件名（不能有空格或特殊字符）
+ls -la /opt/bambu-control/flutter_assets/assets/
+
+# 检查 manifest 是否更新
+strings /opt/bambu-control/flutter_assets/AssetManifest.bin | grep bambu
+
+# 确认 kernel_blob.bin 也是最新的
+ls -la /opt/bambu-control/kernel_blob.bin
+```
+
+### 7.4 闪退无日志
+
+```bash
+flutter-pi -v /opt/bambu-control 2>&1 | tee app.log
+```
+
+---
+
+## 8. systemd 自启动（可选）
 
 ```bash
 sudo tee /etc/systemd/system/bambu-lab-app.service << 'EOF'
@@ -147,9 +326,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/bambu_lab_app
-ExecStart=/usr/local/bin/flutter-pi --release /home/pi/bambu_lab_app/bambu_lab_app
+User=root
+WorkingDirectory=/opt/bambu-control
+ExecStart=/usr/local/bin/flutter-pi /opt/bambu-control
 Restart=on-failure
 RestartSec=5
 
@@ -163,114 +342,8 @@ sudo systemctl start bambu-lab-app
 
 ---
 
-## 4. SQLite 数据库说明
-
-本应用使用 `drift` + `NativeDatabase` 存储打印机配置和调试日志。相关改动已在 `lib/db/database.dart` 中完成：
-
-```dart
-// Linux 下显式指定 sqlite3 库路径
-if (Platform.isLinux) {
-  try {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so.0'),
-    );
-  } catch (_) {
-    open.overrideFor(
-      OperatingSystem.linux,
-      () => DynamicLibrary.open('libsqlite3.so'),
-    );
-  }
-}
-```
-
-数据库文件位置：`$HOME/.local/share/bambu_lab_app/bambu_lab_app.sqlite`
-
----
-
-## 5. 故障排查
-
-### 5.1 sqlite3.so 未找到
-
-```bash
-# 确认系统包已安装
-dpkg -l | grep libsqlite3-0
-
-# 确认 .so 存在
-find /usr/lib -name "libsqlite3*"
-
-# 如果装在非标准路径，添加到 LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-```
-
-### 5.2 flutter-pi 报 "failed to open DRM device"
-
-```bash
-# 确认用户在 video 组
-groups $USER
-
-# 确认 DRM 设备存在
-ls -la /dev/dri/
-
-# 如果没有，检查是否在用 HDMI 连接显示器
-```
-
-### 5.3 触摸/鼠标输入不响应
-
-```bash
-# 检查输入设备
-ls -la /dev/input/
-
-# 确认用户在 input 组
-groups $USER
-```
-
-### 5.4 应用闪退无日志
-
-```bash
-# 加上日志参数运行
-flutter-pi -v --release bambu_lab_app 2>&1 | tee app.log
-
-# 或使用 strace 追踪
-strace -f flutter-pi --release bambu_lab_app 2>&1 | grep -E "sqlite3|openat"
-```
-
----
-
-## 6. CI/CD 自动编译（GitHub Actions 示例）
-
-```yaml
-name: Build Linux ARM64
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-      - run: |
-          sudo apt-get update
-          sudo apt-get install -y libsqlite3-0
-      - run: flutter pub get
-        working-directory: bambu_lab_app
-      - run: flutter build linux --target-platform linux-arm64
-        working-directory: bambu_lab_app
-      - uses: actions/upload-artifact@v4
-        with:
-          name: bambu-lab-app-arm64
-          path: bambu_lab_app/build/linux/arm64/release/bundle/
-```
-
----
-
-## 7. 参考链接
+## 9. 参考链接
 
 - [flutter-pi GitHub](https://github.com/ardera/flutter-pi)
-- [Flutter Linux 桌面支持](https://docs.flutter.dev/platform-integration/linux/building)
-- [drift 数据库文档](https://drift.simonbinder.eu/docs/)
+- [drift 文档](https://drift.simonbinder.eu/docs/)
+- [sqlite3 pub.dev](https://pub.dev/packages/sqlite3)

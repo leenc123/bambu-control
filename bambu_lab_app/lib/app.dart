@@ -38,11 +38,13 @@ class BambuLabApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             useMaterial3: true,
+            fontFamily: 'NotoSansSC',
             colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF034C27), brightness: Brightness.light),
             scaffoldBackgroundColor: NeuoColors.light.background,
           ),
           darkTheme: ThemeData(
             useMaterial3: true,
+            fontFamily: 'NotoSansSC',
             colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4CAF78), brightness: Brightness.dark),
             scaffoldBackgroundColor: NeuoColors.dark.background,
           ),
