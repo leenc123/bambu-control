@@ -117,7 +117,7 @@ class _SplashScreenState extends State<SplashScreen>
                   width: 140,
                   height: 140,
                   child: Lottie.asset(
-                    'assets/bambu control.json',
+                    'assets/bambu_control.json',
                     controller: _lottieController,
                     repeat: false,
                     onLoaded: (composition) {

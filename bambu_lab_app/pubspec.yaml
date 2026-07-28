@@ -57,7 +57,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/printer_images/
-    - assets/bambu control.json
+    - assets/bambu_control.json
     - bamboo_app_logo.png
 
 flutter_launcher_icons:
