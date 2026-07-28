@@ -1,12 +1,14 @@
 /// Drift 数据库定义 - 打印机配置存储
 library;
 
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:sqlite3/open.dart';
 
 import 'printer_dao.dart';
 import 'debug_log_dao.dart';
@@ -67,6 +69,21 @@ class AppDatabase extends _$AppDatabase {
       );
 
   static QueryExecutor _openConnection() {
+    // flutter-pi 无插件系统，Linux 下手动指定系统 sqlite3 库
+    if (Platform.isLinux) {
+      try {
+        open.overrideFor(
+          OperatingSystem.linux,
+          () => DynamicLibrary.open('libsqlite3.so.0'),
+        );
+      } catch (_) {
+        open.overrideFor(
+          OperatingSystem.linux,
+          () => DynamicLibrary.open('libsqlite3.so'),
+        );
+      }
+    }
+
     return LazyDatabase(() async {
       final docsDir = await getApplicationDocumentsDirectory();
       final file = File(p.join(docsDir.path, 'bambu_lab_app.sqlite'));

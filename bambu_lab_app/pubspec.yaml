@@ -17,8 +17,9 @@ dependencies:
   provider: ^6.1.2
   # MQTT communication
   mqtt_client: ^10.6.0
-  # Database (SQLite) — sqlite3 3.x 通过 build hooks 自动打包所有平台
+  # Database (SQLite) — sqlite3 锁定 2.x，3.x 的 native assets 与 flutter-pi 不兼容
   drift: ^2.22.1
+  sqlite3_flutter_libs: ^0.5.28
   path_provider: ^2.1.5
   path: ^1.9.0
   # Navigation
@@ -45,6 +46,12 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.3
   drift_dev: ^2.22.1
   build_runner: ^2.4.14
+
+# 锁定 sqlite3 2.x + drift < 2.32（2.32+ 强制要求 sqlite3 3.x，flutter-pi 不兼容）
+dependency_overrides:
+  sqlite3: ^2.9.0
+  drift: ">=2.22.0 <2.32.0"
+  drift_dev: ">=2.22.0 <2.32.0"
 
 flutter:
   uses-material-design: true
