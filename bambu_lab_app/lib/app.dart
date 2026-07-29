@@ -12,6 +12,7 @@ import 'package:bambu_lab_app/screens/dashboard/dashboard_screen.dart';
 import 'package:bambu_lab_app/screens/home/home_screen.dart';
 import 'package:bambu_lab_app/screens/splash/splash_screen.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
+import 'package:flutter_onscreen_keyboard/flutter_onscreen_keyboard.dart';
 
 class BambuLabApp extends StatelessWidget {
   const BambuLabApp({super.key});
@@ -57,24 +58,26 @@ class BambuLabApp extends StatelessWidget {
                 return Listener(
                   onPointerDown: (_) => ss.resetTimer(),
                   onPointerMove: (_) => ss.resetTimer(),
-                  child: Stack(
-                    children: [
-                      NeuoTheme(
-                        colors: brightness == Brightness.dark ? NeuoColors.dark : NeuoColors.light,
-                        child: SafeArea(
-                          left: true, right: true, top: false, bottom: false,
-                          child: child!,
-                        ),
-                      ),
-                      if (ss.isActive)
-                        Positioned.fill(
-                          child: GestureDetector(
-                            onTap: () => ss.resetTimer(),
-                            behavior: HitTestBehavior.opaque,
-                            child: const ColoredBox(color: Colors.black),
+                  child: OnscreenKeyboard(
+                    child: Stack(
+                      children: [
+                        NeuoTheme(
+                          colors: brightness == Brightness.dark ? NeuoColors.dark : NeuoColors.light,
+                          child: SafeArea(
+                            left: true, right: true, top: false, bottom: false,
+                            child: child!,
                           ),
                         ),
-                    ],
+                        if (ss.isActive)
+                          Positioned.fill(
+                            child: GestureDetector(
+                              onTap: () => ss.resetTimer(),
+                              behavior: HitTestBehavior.opaque,
+                              child: const ColoredBox(color: Colors.black),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 );
               },

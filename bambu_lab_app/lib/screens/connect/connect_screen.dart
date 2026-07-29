@@ -11,6 +11,7 @@ import 'package:bambu_lab_app/models/printer_config.dart';
 import 'package:bambu_lab_app/models/printer_type.dart';
 import 'package:bambu_lab_app/providers/printer_config_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
+import 'package:flutter_onscreen_keyboard/flutter_onscreen_keyboard.dart';
 
 class ConnectScreen extends StatefulWidget {
   const ConnectScreen({super.key, this.editId});
@@ -145,7 +146,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: c.textSecondary)),
       const SizedBox(height: 5),
-      TextFormField(
+      OnscreenKeyboardTextFormField(
         controller: ctrl,
         obscureText: obscure,
         keyboardType: keyboardType,
@@ -170,7 +171,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       const SizedBox(height: 5),
       Row(children: [
         Expanded(
-          child: TextFormField(
+          child: OnscreenKeyboardTextFormField(
             controller: _accessCodeCtrl,
             obscureText: _obscureCode,
             style: TextStyle(fontSize: 14, color: c.textPrimary, letterSpacing: _obscureCode ? 2 : 1),

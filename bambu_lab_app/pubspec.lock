@@ -278,6 +278,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.0.2"
+  flutter_onscreen_keyboard:
+    dependency: "direct main"
+    description:
+      name: flutter_onscreen_keyboard
+      sha256: "01ea145d5f83e2ed7bb1837a8efbf2b07c43225d3818140b8ad9651f8ddd5c54"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.4.7"
   flutter_test:
     dependency: "direct dev"
     description: flutter
