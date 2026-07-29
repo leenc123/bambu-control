@@ -59,6 +59,9 @@ class BambuLabApp extends StatelessWidget {
                   onPointerDown: (_) => ss.resetTimer(),
                   onPointerMove: (_) => ss.resetTimer(),
                   child: OnscreenKeyboard(
+                    // 固定宽度，避免 MediaQuery 在 Overlay 上下文不准导致溢出
+                    width: (_) => 360,
+                    theme: const OnscreenKeyboardThemeData(useSafeArea: false),
                     child: Stack(
                       children: [
                         NeuoTheme(
