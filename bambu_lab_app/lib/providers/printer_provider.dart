@@ -156,16 +156,15 @@ class PrinterProvider extends ChangeNotifier {
     try {
       Uint8List? image;
 
-      // 优先从 .3mf 提取缩略图（需要 subtaskName）
-      final subtaskName = _state.subtaskName;
-      if (subtaskName != null && subtaskName.isNotEmpty) {
-        DebugLog.i('PREVIEW', '尝试从 .3mf 提取缩略图: $subtaskName');
-        image = await _ftp!.fetchCoverImageFrom3mf(subtaskName);
-        if (image != null) {
-          DebugLog.i('PREVIEW', '.3mf 缩略图提取成功');
-        } else {
-          DebugLog.i('PREVIEW', '.3mf 缩略图提取失败: ${_ftp!.lastError}');
-        }
+      // 优先从 .3mf 提取缩略图（需要 subtaskName / gcodeFile）
+      final subtaskName = _state.subtaskName ?? '';
+      final gcodeFile = _state.gcodeFile;
+      DebugLog.i('PREVIEW', '尝试从 .3mf 提取缩略图: subtaskName=$subtaskName, gcodeFile=$gcodeFile');
+      image = await _ftp!.fetchCoverImageFrom3mf(subtaskName, gcodeFile: gcodeFile);
+      if (image != null) {
+        DebugLog.i('PREVIEW', '.3mf 缩略图提取成功');
+      } else {
+        DebugLog.i('PREVIEW', '.3mf 缩略图提取失败: ${_ftp!.lastError}');
       }
 
       // fallback: 从 /image 目录获取摄像头快照

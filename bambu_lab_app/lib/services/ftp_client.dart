@@ -275,8 +275,8 @@ class ImplicitFTPSClient {
 
   /* ---------- 数据通道 ---------- */
 
-  /// 打开数据通道：PASV → 连 TCP → 升级 TLS
-  Future<RawSecureSocket> _openDataChannel() async {
+  /// 打开数据通道：PASV → 直接建立 TLS 连接（复用控制通道的 SSL session）
+  Future<SecureSocket> _openDataChannel() async {
     await _send('PASV');
     final resp = await _expectSuccess();
 
@@ -287,31 +287,25 @@ class ImplicitFTPSClient {
       throw FtpException('无法解析 PASV 响应: ${resp.message}');
     }
 
-    final dataHost = '${m[1]}.${m[2]}.${m[3]}.${m[4]}';
     final dataPort = int.parse(m[5]!) * 256 + int.parse(m[6]!);
 
-    // 先建明文 TCP，再升级为 TLS
-    final plain = await RawSocket.connect(dataHost, dataPort,
-        timeout: _timeout);
-    final secure = await RawSecureSocket.secure(
-      plain,
+    // 直接用 SecureSocket.connect 建立 TLS 连接，复用 _context 中的 SSL session
+    // 避免先建明文再升级（RawSocket → RawSecureSocket.secure）导致的 session 不继承
+    return await SecureSocket.connect(
+      _host,
+      dataPort,
       context: _context,
       onBadCertificate: _allowSelfSigned ? (_) => true : null,
+      timeout: _timeout,
     );
-    return secure;
   }
 
   /// 从数据通道读取全部字节（用于下载文件）
-  Future<Uint8List> _readAllFromDataChannel(RawSecureSocket channel) async {
+  Future<Uint8List> _readAllFromDataChannel(SecureSocket channel) async {
     final bytes = <int>[];
     final completer = Completer<void>();
     final sub = channel.listen(
-      (_) {
-        while (channel.available() > 0) {
-          final chunk = channel.read();
-          if (chunk != null) bytes.addAll(chunk);
-        }
-      },
+      (data) => bytes.addAll(data),
       onDone: () => completer.complete(),
       onError: (e) {
         if (!completer.isCompleted) completer.completeError(e);
@@ -325,21 +319,17 @@ class ImplicitFTPSClient {
 
   /// 从数据通道读取文本行（用于 MLSd/LIST）
   Future<List<String>> _readLinesFromDataChannel(
-      RawSecureSocket channel) async {
+      SecureSocket channel) async {
     final lines = <String>[];
     final completer = Completer<void>();
     final sub = channel.listen(
-      (_) {
-        while (channel.available() > 0) {
-          final chunk = channel.read();
-          if (chunk == null) continue;
-          int start = 0;
-          for (int i = 0; i < chunk.length; i++) {
-            if (chunk[i] == 0x0A) {
-              final end = (i > 0 && chunk[i - 1] == 0x0D) ? i - 1 : i;
-              lines.add(utf8.decode(chunk.sublist(start, end)));
-              start = i + 1;
-            }
+      (data) {
+        int start = 0;
+        for (int i = 0; i < data.length; i++) {
+          if (data[i] == 0x0A) {
+            final end = (i > 0 && data[i - 1] == 0x0D) ? i - 1 : i;
+            lines.add(utf8.decode(data.sublist(start, end)));
+            start = i + 1;
           }
         }
       },
@@ -372,7 +362,8 @@ class ImplicitFTPSClient {
 
     await _send('RETR $remotePath');
     final resp = await _readResponse();
-    if (!resp.isSuccess) {
+    // 1xx（150 开始传输）和 2xx 都算成功，3xx/4xx/5xx 才报错
+    if (resp.code >= 300) {
       await dataChannel.close();
       throw FtpException('RETR 失败: ${resp.message}', resp.code);
     }
@@ -401,27 +392,33 @@ class ImplicitFTPSClient {
     await _send('MLSD');
     var resp = await _readResponse();
     List<String> lines;
+    /// 实际使用了哪个命令（MLSD 还是回退的 LIST）
+    bool isMlsd;
 
-    if (!resp.isSuccess) {
+    // FTP 数据命令先返回 1xx（150 开始传输），再返回 2xx（226 完成）
+    // 3xx/4xx/5xx 才是真实的失败
+    if (resp.code >= 300) {
       // MLSD 不支持 → 回退 LIST
+      isMlsd = false;
       await dataChannel.close();
       final ch2 = await _openDataChannel();
       await _send('LIST');
       resp = await _readResponse();
-      if (!resp.isSuccess) {
+      if (resp.code >= 300) {
         await ch2.close();
         throw FtpException('LIST 失败: ${resp.message}', resp.code);
       }
       lines = await _readLinesFromDataChannel(ch2);
       await ch2.close();
     } else {
+      isMlsd = true;
       lines = await _readLinesFromDataChannel(dataChannel);
       await dataChannel.close();
     }
 
-    await _readResponse(); // 传输完成
+    await _readResponse(); // 传输完成 226
 
-    return _parseLines(lines, resp.code != 200 ? 'list' : 'mlsd');
+    return _parseLines(lines, isMlsd ? 'mlsd' : 'list');
   }
 
   List<FtpEntry> _parseLines(List<String> lines, String format) {

@@ -180,103 +180,193 @@ class PrinterFtpService {
   /// 从 .3mf 文件中提取打印缩略图（封面图）
   ///
   /// [subtaskName] MQTT 推送的 subtask_name，用于匹配 .3mf 文件名
+  /// [gcodeFile] MQTT 推送的 gcode_file，用作 fallback 文件名
   /// 返回 Metadata/plate_X.png 的字节数据
-  Future<Uint8List?> fetchCoverImageFrom3mf(String subtaskName) async {
+  Future<Uint8List?> fetchCoverImageFrom3mf(String subtaskName, {String? gcodeFile}) async {
     if (_client == null) return null;
-    try {
-      // 1. 构建候选文件名（.3mf 或 .gcode.3mf）
-      final candidates = <String>[
-        if (subtaskName.endsWith('.3mf')) subtaskName,
-        if (!subtaskName.endsWith('.3mf')) '$subtaskName.3mf',
-        if (!subtaskName.endsWith('.3mf')) '$subtaskName.gcode.3mf',
-      ];
 
-      DebugLog.i('FTP', '搜索 .3mf 文件，候选: $candidates');
+    // 构建候选文件名 — 参考 ha-bambulab 的 _attempt_ftp_download 策略：
+    //   先试 subtask_name，再试 gcode_file
+    final candidates = <String>[];
+    void addCandidates(String name) {
+      if (name.isEmpty) return;
+      if (name.endsWith('.3mf')) {
+        candidates.add(name);
+      } else {
+        candidates.add('$name.3mf');
+        candidates.add('$name.gcode.3mf');
+      }
+    }
 
-      // 2. 在 /cache 目录下查找匹配的 .3mf 文件
-      final entries = await _client!.list('/cache');
-      final modelEntry = entries.cast<FtpEntry?>().firstWhere(
-            (e) =>
-                e != null &&
-                !e.isDir &&
-                candidates.any((c) => e.name == c),
-            orElse: () => null,
-          );
+    if (subtaskName.isNotEmpty) {
+      addCandidates(subtaskName);
+    }
+    // gcode_file 可能是完整路径（如 /data/Metadata/plate_1.gcode），取文件名部分
+    if (gcodeFile != null && gcodeFile.isNotEmpty && gcodeFile != subtaskName) {
+      final gcodeBasename = gcodeFile.split('/').last;
+      addCandidates(gcodeBasename);
+    }
 
-      if (modelEntry == null) {
-        _lastError = '未在 /cache 找到匹配的 .3mf 文件';
+    DebugLog.i('FTP', '搜索 .3mf 文件，候选: $candidates');
+
+    // 新打印开始时，打印机可能还没把 .3mf 写入，需要重试
+    // X1 老机型在 RUNNING 后几秒才写完文件，参考 ha-bambulab 重试 13 次 × 5 秒
+    const maxRetries = 13;
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // 有候选文件名时，按文件名匹配
+        if (candidates.isNotEmpty) {
+          final result = await _tryFetchCoverFrom3mf(candidates);
+          if (result != null) return result;
+        } else {
+          // 没有候选文件名（如 subtask_name 为空）→ 降级到最新 .3mf 文件
+          final latestPath = await _findLatest3mfFilePath();
+          if (latestPath != null) {
+            final result = await _downloadAndExtractCover(latestPath);
+            if (result != null) return result;
+          }
+        }
+      } catch (e) {
+        _lastError = '重试 $attempt/$maxRetries 失败: $e';
         DebugLog.i('FTP', _lastError!);
-        return null;
       }
-
-      DebugLog.i('FTP', '找到 .3mf 文件: ${modelEntry.name}');
-
-      // 3. 下载 .3mf 文件到临时目录
-      final tempDir = await getTemporaryDirectory();
-      final localFile = File('${tempDir.path}/${modelEntry.name}');
-
-      // 如果临时文件已存在且大小匹配，跳过下载
-      if (!localFile.existsSync() ||
-          localFile.lengthSync() != (modelEntry.size ?? 0)) {
-        await _client!.downloadFile('/cache/${modelEntry.name}', localFile);
-        if (!localFile.existsSync()) {
-          _lastError = '下载 .3mf 文件失败';
-          return null;
-        }
+      if (attempt < maxRetries) {
+        DebugLog.i('FTP', '等待 5 秒后重试 ($attempt/$maxRetries)');
+        await Future.delayed(const Duration(seconds: 5));
       }
+    }
+    _lastError = '重试 $maxRetries 次后仍未找到 .3mf 文件';
+    DebugLog.i('FTP', _lastError!);
+    return null;
+  }
 
-      // 4. 读取 .3mf（ZIP 格式）并解析
-      final bytes = localFile.readAsBytesSync();
-      final archive = ZipDecoder().decodeBytes(bytes);
+  /// 在 ['/cache', '/'] 两个路径下按候选文件名搜索 .3mf，找到则下载并提取缩略图
+  Future<Uint8List?> _tryFetchCoverFrom3mf(List<String> candidates) async {
+    const searchPaths = ['/cache', '/'];
 
-      // 5. 读取 slice_info.config 提取 plate 编号
-      ArchiveFile? configEntry;
-      for (final f in archive) {
-        if (f.name == 'Metadata/slice_info.config') {
-          configEntry = f;
-          break;
-        }
-      }
-      if (configEntry == null) {
-        _lastError = '.3mf 中未找到 Metadata/slice_info.config';
-        return null;
-      }
+    for (final searchPath in searchPaths) {
+      try {
+        final entries = await _client!.list(searchPath);
+        final modelEntry = entries.cast<FtpEntry?>().firstWhere(
+              (e) =>
+                  e != null &&
+                  !e.isDir &&
+                  candidates.any((c) => e.name == c),
+              orElse: () => null,
+            );
 
-      final configXml = utf8.decode(configEntry.content as List<int>);
-      final plateMatch =
-          RegExp(r'key="index"\s+value="(\d+)"').firstMatch(configXml);
-      final plateNum = plateMatch?.group(1);
-      if (plateNum == null) {
-        _lastError = '未能在 slice_info.config 中找到 plate 编号';
-        return null;
-      }
+        if (modelEntry == null) continue;
 
-      DebugLog.i('FTP', '提取 plate $plateNum 缩略图');
+        final remotePath = '$searchPath/${modelEntry.name}'.replaceAll('//', '/');
+        DebugLog.i('FTP', '找到 .3mf 文件: $remotePath');
+        return await _downloadAndExtractCover(remotePath);
+      } catch (_) {
+        // 尝试下一个路径
+        continue;
+      }
+    }
 
-      // 6. 读取 Metadata/plate_{plateNum}.png
-      ArchiveFile? pngEntry;
-      for (final f in archive) {
-        if (f.name == 'Metadata/plate_$plateNum.png') {
-          pngEntry = f;
-          break;
-        }
-      }
-      if (pngEntry == null) {
-        _lastError = '.3mf 中未找到 Metadata/plate_$plateNum.png';
-        return null;
-      }
+    _lastError = '未在 /cache 或 / 找到匹配的 .3mf 文件';
+    return null;
+  }
 
-      final rawContent = pngEntry.content;
-      if (rawContent is List<int>) {
-        DebugLog.i('FTP', '从 .3mf 提取缩略图成功');
-        return Uint8List.fromList(rawContent);
-      }
-      DebugLog.i('FTP', '从 .3mf 提取缩略图失败: content类型不是List<int>');
-      return null;
-    } catch (e) {
-      _lastError = '从 .3mf 提取缩略图失败: $e';
-      DebugLog.i('FTP', '提取缩略图失败: $e');
+  /// 下载远程 .3mf 文件并提取 plate 缩略图
+  Future<Uint8List?> _downloadAndExtractCover(String remotePath) async {
+    final fileName = remotePath.split('/').last;
+
+    final tempDir = await getTemporaryDirectory();
+    final localFile = File('${tempDir.path}/$fileName');
+    if (localFile.existsSync()) {
+      DebugLog.i('FTP', '清除旧缓存: ${localFile.path}');
+      await localFile.delete();
+    }
+    await _client!.downloadFile(remotePath, localFile);
+    if (!localFile.existsSync()) {
+      _lastError = '下载 .3mf 文件失败';
       return null;
     }
+
+    // 读取 .3mf（ZIP 格式）并解析
+    final bytes = localFile.readAsBytesSync();
+    final archive = ZipDecoder().decodeBytes(bytes);
+
+    // 读取 slice_info.config 提取 plate 编号（参考 ha-bambulab ElementTree 解析方式）
+    ArchiveFile? configEntry;
+    for (final f in archive) {
+      if (f.name == 'Metadata/slice_info.config') {
+        configEntry = f;
+        break;
+      }
+    }
+    if (configEntry == null) {
+      _lastError = '.3mf 中未找到 Metadata/slice_info.config';
+      return null;
+    }
+
+    final configXml = utf8.decode(configEntry.content as List<int>);
+    final plateMatch =
+        RegExp(r'key="index"\s+value="(\d+)"').firstMatch(configXml);
+    final plateNum = plateMatch?.group(1);
+    if (plateNum == null) {
+      _lastError = '未能在 slice_info.config 中找到 plate 编号';
+      return null;
+    }
+
+    DebugLog.i('FTP', '提取 plate $plateNum 缩略图');
+
+    // 读取 Metadata/plate_{plateNum}.png
+    for (final f in archive) {
+      if (f.name == 'Metadata/plate_$plateNum.png') {
+        final content = f.content;
+        if (content is List<int>) {
+          DebugLog.i('FTP', '从 .3mf 提取缩略图成功 ($remotePath)');
+          return Uint8List.fromList(content);
+        }
+      }
+    }
+    _lastError = '.3mf 中未找到 Metadata/plate_$plateNum.png';
+    return null;
   }
+
+  /// 在 ['/cache', '/'] 中按时间戳找最新的 .3mf 文件，返回远程路径
+  /// 当 subtask_name 为空时（如打印机重启后）用作 fallback
+  Future<String?> _findLatest3mfFilePath() async {
+    const searchPaths = ['/cache', '/'];
+
+    final candidates = <_RemoteFile>[];
+
+    for (final searchPath in searchPaths) {
+      try {
+        final entries = await _client!.list(searchPath);
+        for (final e in entries) {
+          if (e.isDir) continue;
+          final lower = e.name.toLowerCase();
+          if (lower.endsWith('.3mf') || lower.endsWith('.gcode.3mf')) {
+            final remotePath =
+                '$searchPath/${e.name}'.replaceAll('//', '/');
+            candidates.add(_RemoteFile(
+              path: remotePath,
+              modifyTime: e.modifyTime ?? DateTime(1970),
+            ));
+          }
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+
+    if (candidates.isEmpty) return null;
+
+    candidates.sort((a, b) => b.modifyTime.compareTo(a.modifyTime));
+    DebugLog.i('FTP', '降级到最新 .3mf: ${candidates.first.path}');
+    return candidates.first.path;
+  }
+}
+
+// ---- 内部辅助类型 ----
+
+class _RemoteFile {
+  final String path;
+  final DateTime modifyTime;
+  const _RemoteFile({required this.path, required this.modifyTime});
 }
