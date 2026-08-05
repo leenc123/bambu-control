@@ -57,15 +57,11 @@ jobs:
             flutter create --platforms=linux .
           fi
 
-      - name: Strip flutter-pi dependency_overrides
-        working-directory: bambu_lab_app
-        run: |
-          # 移除 dependency_overrides（sqlite3 2.x、drift <2.32）
-          # 这些是 flutter-pi 兼容性 hack，标准 Linux GTK 构建不需要
-          # sqlite3_flutter_libs 自带 3.x，能正常工作
-          sed -i '/^dependency_overrides:/,/^$/{d}' pubspec.yaml
-          echo "--- pubspec.yaml after strip ---"
-          tail -20 pubspec.yaml
+      # 注意：不要剥离 dependency_overrides！
+      # sqlite3 锁定 2.x / drift <2.32 是应用代码依赖的 API：
+      #   - database.dart 用 package:sqlite3/open.dart（2.x 才有）
+      #   - sqlite3 3.x 移除了 open.dart（改用 native assets），编译会挂
+      # 这些版本约束在标准 Linux GTK 构建上同样有效，无需修改。
 
       - name: Flutter pub get
         working-directory: bambu_lab_app
