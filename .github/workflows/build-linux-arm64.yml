@@ -64,24 +64,23 @@ jobs:
           mkdir -p "$ARTIFACT"
           cp -r "$BUNDLE_DIR"/* "$ARTIFACT/"
 
-          # 附上运行说明
-          cat > "$ARTIFACT/README.txt" << 'EOF'
-         Bambu Lab App — Linux ARM64
-
-         运行方法（在 postmarketOS / ARM Linux 设备上）:
-           chmod +x bambu_lab_app
-           ./bambu_lab_app
-
-         依赖（如果运行报错缺少 .so）:
-           sudo apk add gtk+3.0 libstdc++ sqlite-libs
-          # 或 Debian 系:
-           sudo apt-get install libgtk-3-0 libsqlite3-0
-
-         数据目录: ~/.local/share/bambu_lab_app/
-         EOF
+          printf '%s\n' \
+            "Bambu Lab App — Linux ARM64" \
+            "" \
+            "运行方法（在 postmarketOS / ARM Linux 设备上）:" \
+            "  chmod +x bambu_lab_app" \
+            "  ./bambu_lab_app" \
+            "" \
+            "依赖（如果运行报错缺少 .so）:" \
+            "  sudo apk add gtk+3.0 libstdc++ sqlite-libs" \
+            "  # 或 Debian 系:" \
+            "  sudo apt-get install libgtk-3-0 libsqlite3-0" \
+            "" \
+            "数据目录: ~/.local/share/bambu_lab_app/" \
+            > "$ARTIFACT/README.txt"
 
           tar czf "${ARTIFACT}.tar.gz" "$ARTIFACT"
-          echo "artifact_name=${ARTIFACT}.tar.gz" >> $GITHUB_ENV
+          echo "artifact_name=${ARTIFACT}.tar.gz" >> "$GITHUB_ENV"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
