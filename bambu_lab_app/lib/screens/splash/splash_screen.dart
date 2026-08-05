@@ -1,11 +1,14 @@
-/// 开屏页 — Lottie Logo 动画 → App 名称淡入 → 进入主页
+/// 开屏页 — Logo 图片 → App 名称淡入 → 进入主页
+///
+/// 注意：已移除 Lottie 动画。postmarketOS (musl) 上 Dart VM 栈误判，
+/// 首帧树越深越容易 Stack Overflow；Lottie 的 126KB JSON 首帧解码
+/// 是压垮栈的最后一根稻草。改用静态图片后首帧树显著变浅。
 library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lottie/lottie.dart';
 
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -19,9 +22,6 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  /// 控制 Lottie Logo 动画
-  late final AnimationController _lottieController;
-
   /// 控制文字淡入 + 上滑
   late final AnimationController _textController;
   late final Animation<double> _titleFade;
@@ -30,26 +30,14 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<Offset> _subSlide;
   String _version = '';
 
-  /// 兜底定时器：Lottie 加载/播放卡住时强制进入文字动画
-  Timer? _lottieFallbackTimer;
-
   @override
   void initState() {
     super.initState();
     _loadVersion();
 
-    // ---------- Lottie 控制器 ----------
-    _lottieController = AnimationController(vsync: this);
-    _lottieController.addStatusListener((status) {
-      if (status == AnimationStatus.completed && mounted) {
-        _lottieFallbackTimer?.cancel();
-        _startTextAnimation();
-      }
-    });
-
-    // 兜底：如果 Lottie 的 onLoaded 一直不触发（解码失败等），
-    // 3 秒后强制进入文字动画，避免永远卡在开屏页（白屏）
-    _lottieFallbackTimer = Timer(const Duration(seconds: 3), () {
+    // 静态 logo：无 Lottie JSON 解码，首帧树浅，规避 musl 栈误判
+    // 短暂停留后开始文字动画（原 Lottie 播放时序的近似）
+    Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) _startTextAnimation();
     });
 
@@ -112,8 +100,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
-    _lottieFallbackTimer?.cancel();
-    _lottieController.dispose();
     _textController.dispose();
     super.dispose();
   }
@@ -129,31 +115,11 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ---- Logo 动画（小尺寸） ----
-                // flutter-pi 下 Lottie 可能解码失败，降级为静态 logo
-                SizedBox(
+                // ---- Logo（静态图片，无 Lottie 解码） ----
+                Image.asset(
+                  'bamboo_app_logo.png',
                   width: 140,
                   height: 140,
-                  child: Lottie.asset(
-                    'assets/bambu_control.json',
-                    controller: _lottieController,
-                    repeat: false,
-                    errorBuilder: (_, __, ___) {
-                      // Lottie 解码失败：直接开始文字动画，不阻塞导航
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) _startTextAnimation();
-                      });
-                      return Image.asset(
-                        'bamboo_app_logo.png',
-                        width: 140,
-                        height: 140,
-                      );
-                    },
-                    onLoaded: (composition) {
-                      _lottieController.duration = composition.duration;
-                      _lottieController.forward();
-                    },
-                  ),
                 ),
                 const SizedBox(height: 40),
                 // ---- App 名称（动画结束后淡入） ----

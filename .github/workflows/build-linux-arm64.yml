@@ -118,13 +118,19 @@ jobs:
             -o "$ARTIFACT/libbigstack.so" \
             tools/bigstack.c
           musl-gcc -o "$ARTIFACT/stackcheck" tools/stackcheck.c
+          chmod +x "$ARTIFACT/stackcheck"
           echo "--- built bigstack/stackcheck ---"
           file "$ARTIFACT/libbigstack.so" "$ARTIFACT/stackcheck"
 
-          # 一键启动脚本：musl 下用 LD_PRELOAD 放大线程栈再启动
+          # 一键启动脚本：musl 下放大线程栈再启动
+          #   ulimit -s        → 主线程（exec 时内核按 RLIMIT_STACK 映射）
+          #   LD_PRELOAD       → 引擎 worker 线程（musl 默认仅 128KB）
           printf '%s\n' \
             "#!/bin/sh" \
             "cd \"\$(dirname \"\$0\")\" || exit 1" \
+            "# 主线程栈尽量放大（硬限制可能不允许，失败就忽略）" \
+            "ulimit -s 65536 2>/dev/null" \
+            "# 引擎内部线程栈强制 8MB（musl 默认 128KB 会随机 Stack Overflow）" \
             "export LD_PRELOAD=\$PWD/libbigstack.so" \
             "exec ./bambu_lab_app \"\$@\"" \
             > "$ARTIFACT/run.sh"
