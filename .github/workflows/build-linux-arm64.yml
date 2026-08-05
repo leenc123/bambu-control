@@ -84,6 +84,25 @@ jobs:
           mkdir -p "$ARTIFACT"
           cp -r "$BUNDLE_DIR"/* "$ARTIFACT/"
 
+          # ---- musl (postmarketOS/Alpine) 兼容性修复 ----
+          # sqlite3_flutter_libs 插件把 glibc 编译的完整 sqlite3 静态编进
+          # libsqlite3_flutter_libs_plugin.so，其引用 fcntl64 符号，在 musl
+          # 上不存在 → 启动时 "Error relocating ... symbol not found" 崩溃。
+          # 应用在 Linux 上使用系统 libsqlite3（lib/db/database.dart 的
+          # overrideFor），插件内 sqlite3 是死代码。原插件注册函数为空，
+          # 这里用 musl-gcc 编译一个同样只导出注册符号的空 stub 替换。
+          sudo apt-get install -y musl-tools
+          printf '%s\n' \
+            "void sqlite3_flutter_libs_plugin_register_with_registrar(void* registrar) {" \
+            "  (void)registrar;" \
+            "}" \
+            > /tmp/sqlite3_plugin_stub.c
+          musl-gcc -shared -fPIC \
+            -o "$ARTIFACT/lib/libsqlite3_flutter_libs_plugin.so" \
+            /tmp/sqlite3_plugin_stub.c
+          echo "--- sqlite3 plugin stub (musl aarch64) ---"
+          file "$ARTIFACT/lib/libsqlite3_flutter_libs_plugin.so"
+
           printf '%s\n' \
             "Bambu Lab App — Linux ARM64" \
             "" \
