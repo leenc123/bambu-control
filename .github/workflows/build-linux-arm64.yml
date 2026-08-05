@@ -110,12 +110,35 @@ jobs:
           echo "--- sqlite3 plugin stub (musl aarch64) ---"
           file "$ARTIFACT/lib/libsqlite3_flutter_libs_plugin.so"
 
+          # ---- musl 线程栈放大工具 ----
+          # musl 默认线程栈 128KB（glibc 8MB），glibc 编译的 Flutter 引擎
+          # 内部线程随机 Stack Overflow。libbigstack.so 通过 LD_PRELOAD
+          # 强制所有新线程 8MB 栈；stackcheck 用于确认线程栈大小。
+          musl-gcc -shared -fPIC \
+            -o "$ARTIFACT/libbigstack.so" \
+            tools/bigstack.c
+          musl-gcc -o "$ARTIFACT/stackcheck" tools/stackcheck.c
+          echo "--- built bigstack/stackcheck ---"
+          file "$ARTIFACT/libbigstack.so" "$ARTIFACT/stackcheck"
+
+          # 一键启动脚本：musl 下用 LD_PRELOAD 放大线程栈再启动
+          printf '%s\n' \
+            "#!/bin/sh" \
+            "cd \"\$(dirname \"\$0\")\" || exit 1" \
+            "export LD_PRELOAD=\$PWD/libbigstack.so" \
+            "exec ./bambu_lab_app \"\$@\"" \
+            > "$ARTIFACT/run.sh"
+          chmod +x "$ARTIFACT/run.sh"
+
           printf '%s\n' \
             "Bambu Lab App — Linux ARM64" \
             "" \
             "运行方法（在 postmarketOS / ARM Linux 设备上）:" \
-            "  chmod +x bambu_lab_app" \
-            "  ./bambu_lab_app" \
+            "  1) 先确认线程栈大小: ./stackcheck" \
+            "     (musl 默认 128KB，正常应显示 8MB 级别)" \
+            "  2) 用大栈启动（关键！musl 线程栈太小导致随机 Stack Overflow）:" \
+            "     LD_PRELOAD=\$PWD/libbigstack.so ./bambu_lab_app" \
+            "     或: sh run.sh" \
             "" \
             "依赖（如果运行报错缺少 .so）:" \
             "  sudo apk add gtk+3.0 libstdc++ sqlite-libs" \
