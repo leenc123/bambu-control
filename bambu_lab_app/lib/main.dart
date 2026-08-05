@@ -1,6 +1,9 @@
 /// Bambu Lab App - 入口文件
 library;
 
+import 'dart:io';
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -14,8 +17,46 @@ import 'package:bambu_lab_app/providers/screen_saver_provider.dart';
 import 'package:bambu_lab_app/utils/debug_log.dart';
 import 'package:flutter/services.dart';
 
+/// 将未捕获的 Flutter/Dart 错误写入本地文件（排查白屏/黑屏用）
+///
+/// 日志位置: $HOME/bambu_lab_app_crash.log
+/// 只写文件 + 简单打印，不做栈解析 —— 之前 stack overflow 时
+/// 错误报告的栈解析本身级联崩溃，把真正的根因刷没了。
+void _installCrashLog() {
+  final logFile = File(
+    '${Platform.environment['HOME'] ?? '/tmp'}/bambu_lab_app_crash.log',
+  );
+
+  void write(Object error, StackTrace? stack) {
+    try {
+      logFile.writeAsStringSync(
+        '${DateTime.now().toIso8601String()}\n$error\n$stack\n'
+        '${'-' * 60}\n',
+        mode: FileMode.append,
+      );
+    } catch (_) {
+      // 写日志失败则忽略（例如磁盘满）
+    }
+  }
+
+  FlutterError.onError = (details) {
+    write(details.exception, details.stack);
+    debugPrint('CRASH: ${details.exception}');
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    write(error, stack);
+    debugPrint('CRASH: $error');
+    // 吞掉未处理异步错误，防止整个 isolate 崩溃导致黑屏
+    return true;
+  };
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 白屏/黑屏排查：首个未捕获异常先落盘，避免级联刷屏
+  _installCrashLog();
 
   final database = AppDatabase();
   DebugLog.setDatabase(database);
