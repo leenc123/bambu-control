@@ -1,0 +1,91 @@
+name: Build Linux ARM64
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm  # GitHub 原生 ARM64 运行器
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev \
+            libstdc++-12-dev
+
+      - name: Enable Linux platform
+        working-directory: bambu_lab_app
+        run: |
+          # 如果 linux/ 目录不存在则创建（不覆盖已有平台）
+          if [ ! -d linux ]; then
+            flutter create --platforms=linux .
+          fi
+
+      - name: Strip flutter-pi dependency_overrides
+        working-directory: bambu_lab_app
+        run: |
+          # 移除 dependency_overrides（sqlite3 2.x、drift <2.32）
+          # 这些是 flutter-pi 兼容性 hack，标准 Linux GTK 构建不需要
+          # sqlite3_flutter_libs 自带 3.x，能正常工作
+          sed -i '/^dependency_overrides:/,/^$/{d}' pubspec.yaml
+          echo "--- pubspec.yaml after strip ---"
+          tail -20 pubspec.yaml
+
+      - name: Flutter pub get
+        working-directory: bambu_lab_app
+        run: flutter pub get
+
+      - name: Build Linux release
+        working-directory: bambu_lab_app
+        run: flutter build linux --release
+
+      - name: Package build artifacts
+        working-directory: bambu_lab_app
+        run: |
+          BUNDLE_DIR="build/linux/arm64/release/bundle"
+          ARTIFACT="bambu-lab-app-linux-arm64"
+
+          mkdir -p "$ARTIFACT"
+          cp -r "$BUNDLE_DIR"/* "$ARTIFACT/"
+
+          # 附上运行说明
+          cat > "$ARTIFACT/README.txt" << 'EOF'
+         Bambu Lab App — Linux ARM64
+
+         运行方法（在 postmarketOS / ARM Linux 设备上）:
+           chmod +x bambu_lab_app
+           ./bambu_lab_app
+
+         依赖（如果运行报错缺少 .so）:
+           sudo apk add gtk+3.0 libstdc++ sqlite-libs
+          # 或 Debian 系:
+           sudo apt-get install libgtk-3-0 libsqlite3-0
+
+         数据目录: ~/.local/share/bambu_lab_app/
+         EOF
+
+          tar czf "${ARTIFACT}.tar.gz" "$ARTIFACT"
+          echo "artifact_name=${ARTIFACT}.tar.gz" >> $GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bambu-lab-app-linux-arm64
+          path: bambu_lab_app/bambu-lab-app-linux-arm64.tar.gz
+          retention-days: 30
