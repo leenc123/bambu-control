@@ -1,6 +1,8 @@
 /// 开屏页 — Lottie Logo 动画 → App 名称淡入 → 进入主页
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
@@ -28,6 +30,9 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<Offset> _subSlide;
   String _version = '';
 
+  /// 兜底定时器：Lottie 加载/播放卡住时强制进入文字动画
+  Timer? _lottieFallbackTimer;
+
   @override
   void initState() {
     super.initState();
@@ -37,8 +42,15 @@ class _SplashScreenState extends State<SplashScreen>
     _lottieController = AnimationController(vsync: this);
     _lottieController.addStatusListener((status) {
       if (status == AnimationStatus.completed && mounted) {
+        _lottieFallbackTimer?.cancel();
         _startTextAnimation();
       }
+    });
+
+    // 兜底：如果 Lottie 的 onLoaded 一直不触发（解码失败等），
+    // 3 秒后强制进入文字动画，避免永远卡在开屏页（白屏）
+    _lottieFallbackTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) _startTextAnimation();
     });
 
     // ---------- 文字入场控制器 ----------
@@ -90,12 +102,17 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _loadVersion() async {
-    final info = await PackageInfo.fromPlatform();
-    if (mounted) setState(() => _version = info.version);
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) setState(() => _version = info.version);
+    } catch (_) {
+      // 版本信息获取失败不影响启动
+    }
   }
 
   @override
   void dispose() {
+    _lottieFallbackTimer?.cancel();
     _lottieController.dispose();
     _textController.dispose();
     super.dispose();
@@ -121,11 +138,17 @@ class _SplashScreenState extends State<SplashScreen>
                     'assets/bambu_control.json',
                     controller: _lottieController,
                     repeat: false,
-                    errorBuilder: (_, __, ___) => Image.asset(
-                      'bamboo_app_logo.png',
-                      width: 140,
-                      height: 140,
-                    ),
+                    errorBuilder: (_, __, ___) {
+                      // Lottie 解码失败：直接开始文字动画，不阻塞导航
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) _startTextAnimation();
+                      });
+                      return Image.asset(
+                        'bamboo_app_logo.png',
+                        width: 140,
+                        height: 140,
+                      );
+                    },
                     onLoaded: (composition) {
                       _lottieController.duration = composition.duration;
                       _lottieController.forward();

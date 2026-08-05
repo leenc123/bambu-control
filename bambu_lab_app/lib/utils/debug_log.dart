@@ -1,6 +1,7 @@
 /// 调试日志 — 内存环形缓存 + 数据库持久化
 library;
 
+import 'dart:async';
 import 'dart:collection';
 
 import 'package:bambu_lab_app/db/database.dart';
@@ -35,8 +36,8 @@ class DebugLog {
     final entry = LogEntry(DateTime.now(), tag, msg);
     _logs.add(entry);
     while (_logs.length > _max) { _logs.removeFirst(); }
-    // 异步写入数据库，不阻塞主线程
-    _db?.debugLogDao.addLog(entry.time, entry.tag, entry.message);
+    // 异步写入数据库，不阻塞主线程；失败静默（DB 不可用时不能崩溃）
+    _db?.debugLogDao.addLog(entry.time, entry.tag, entry.message).ignore();
   }
 
   /// 初始化（供 main.dart 启动时调用）

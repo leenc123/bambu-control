@@ -8,6 +8,11 @@ Bambu Lab 打印机模拟器
 使用方法：
     pip install paho-mqtt pyftpdlib
     python tools/bambu_printer_simulator.py
+    # 可选参数：
+    #   --broker <地址>    MQTT broker 地址，默认 127.0.0.1（本机 mosquitto）
+    #   --ip <地址>        对外广告的 IP（手机里填的打印机 IP），
+    #                      默认自动检测本机局域网 IP
+    #   示例: python tools/bambu_printer_simulator.py --ip 192.168.1.100
 
 模拟器会：
     - 定期发布打印机状态（温度、进度、状态等）
@@ -17,11 +22,14 @@ Bambu Lab 打印机模拟器
     - 启动 FTP 服务器（端口 9990），用于测试文件浏览/下载
 """
 
+import argparse
 import datetime
+import ipaddress
 import json
 import os
 import random
 import shutil
+import socket
 import ssl
 import tempfile
 import time
@@ -52,9 +60,43 @@ try:
 except ImportError:
     HAS_CRYPTO = False
 
+def _get_lan_ip() -> str:
+    """自动检测本机局域网 IP（手机通过它访问模拟器）"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            # 不实际发包：UDP connect 让内核选一条默认路由
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+        finally:
+            s.close()
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
+    return "127.0.0.1"
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser(description="Bambu Lab 打印机模拟器")
+    parser.add_argument(
+        "--broker", default="127.0.0.1",
+        help="MQTT broker 地址（默认 127.0.0.1，即本机 mosquitto）"
+    )
+    parser.add_argument(
+        "--port", type=int, default=1883,
+        help="MQTT broker 端口（默认 1883）"
+    )
+    parser.add_argument(
+        "--ip", default=None,
+        help="对外广告的 IP（手机里填写的打印机 IP，默认自动检测本机局域网 IP）"
+    )
+    args = parser.parse_args()
+    return args.broker, args.port, args.ip or _get_lan_ip()
+
+
 # 配置
-BROKER_HOST = "127.0.0.1"
-BROKER_PORT = 1883
+BROKER_HOST, BROKER_PORT, LAN_IP = _parse_args()
 SERIAL_NUMBER = "TEST123456789"
 PROJECT_NAME = "N1"  # A1 Mini
 
@@ -644,7 +686,7 @@ class PrinterSimulator:
         subject = issuer = x509.Name([
             x509.NameAttribute(NameOID.COUNTRY_NAME, "CN"),
             x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Bambu Simulator"),
-            x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1"),
+            x509.NameAttribute(NameOID.COMMON_NAME, LAN_IP),
         ])
 
         cert = (
@@ -656,7 +698,10 @@ class PrinterSimulator:
             .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
             .not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365))
             .add_extension(
-                x509.SubjectAlternativeName([x509.DNSName("127.0.0.1"), x509.DNSName("localhost")]),
+                x509.SubjectAlternativeName([
+                    x509.IPAddress(ipaddress.ip_address(LAN_IP)),
+                    x509.DNSName("localhost"),
+                ]),
                 critical=False,
             )
             .sign(key, hashes.SHA256(), backend=default_backend())
@@ -719,7 +764,8 @@ class PrinterSimulator:
 
         handler.authorizer = authorizer
 
-        self.ftp_server = FTPServer(("127.0.0.1", FTP_PORT), handler)
+        # 绑定 0.0.0.0：局域网内的手机也能访问（不再只服务本机）
+        self.ftp_server = FTPServer(("0.0.0.0", FTP_PORT), handler)
 
         self.ftp_server_thread = threading.Thread(
             target=self.ftp_server.serve_forever,
@@ -729,11 +775,11 @@ class PrinterSimulator:
         self.ftp_server_thread.start()
 
         if use_tls:
-            print(f"[FTP] TLS 服务器已启动: ftps://127.0.0.1:{FTP_PORT}/")
+            print(f"[FTP] TLS 服务器已启动: ftps://{LAN_IP}:{FTP_PORT}/")
             print(f"[FTP]   用户: bblp / 密码: 12345678")
             print(f"[FTP]   修改 PrinterFtpService: port = {FTP_PORT}, SecurityType.ftps")
         else:
-            print(f"[FTP] 明文服务器已启动: ftp://127.0.0.1:{FTP_PORT}/")
+            print(f"[FTP] 明文服务器已启动: ftp://{LAN_IP}:{FTP_PORT}/")
             print(f"[FTP]   用户: bblp / 密码: 12345678")
             print(f"[FTP]   修改 PrinterFtpService: port = {FTP_PORT}, SecurityType.ftp")
 
@@ -768,14 +814,18 @@ class PrinterSimulator:
         print("=" * 50)
         print(f"序列号: {SERIAL_NUMBER}")
         print(f"设备型号: {PROJECT_NAME}")
+        print(f"本机局域网 IP: {LAN_IP}")
         print(f"Broker: {BROKER_HOST}:{BROKER_PORT}")
         print()
-        print("在 App 中添加打印机:")
-        print(f"  IP:     {BROKER_HOST}")
+        print("在 App 中添加打印机（手机与电脑需在同一局域网）:")
+        print(f"  IP:     {LAN_IP}")
         print(f"  序列号: {SERIAL_NUMBER}")
         print(f"  访问码: (任意)")
         print(f"  TLS:    关闭 (端口 1883)")
         print(f"  FTP:   端口 9991 (TLS) / 9990 (明文), 用户 bblp / 密码 12345678")
+        print()
+        print("注意: 本机 mosquitto 需监听 0.0.0.0 才能被手机访问")
+        print("      (修改 mosquitto.conf: listener 1883 0.0.0.0)")
         print()
         print("命令: start / stop / pause / resume / light / ftp / quit")
         print("=" * 50)
@@ -801,7 +851,7 @@ class PrinterSimulator:
                     self.set_light(not self.light_on)
                 elif cmd == "ftp":
                     if HAS_FTP and self.ftp_server:
-                        print(f"[FTP] 运行中: ftp://127.0.0.1:9990/")
+                        print(f"[FTP] 运行中: ftp://{LAN_IP}:9990/")
                         print(f"[FTP]   用户: bblp / 密码: 12345678")
                     else:
                         print("[FTP] 未启动（需要 pyftpdlib）")
