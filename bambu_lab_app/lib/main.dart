@@ -52,11 +52,26 @@ void _installCrashLog() {
   };
 }
 
+/// 诊断开关：flutter build --dart-define=MINIMAL=true
+/// 构建一个极简 widget 树（无路由/主题/DB），用于二分定位
+/// "首帧构建栈溢出"（~580 层深挂载链）的来源。
+const bool kMinimalStartup = bool.fromEnvironment('MINIMAL');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 白屏/黑屏排查：首个未捕获异常先落盘，避免级联刷屏
   _installCrashLog();
+
+  if (kMinimalStartup) {
+    // 极简树：若此包仍栈溢出 → 深树在框架层（MaterialApp/引擎）
+    // 若此包正常 → 深树在完整应用树（路由/主题/页面），继续二分
+    debugPrint('MINIMAL 模式：极简 widget 树');
+    runApp(const MaterialApp(
+      home: Scaffold(body: Center(child: Text('MINIMAL'))),
+    ));
+    return;
+  }
 
   final database = AppDatabase();
   DebugLog.setDatabase(database);

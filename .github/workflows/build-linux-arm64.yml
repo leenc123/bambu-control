@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:  # 允许手动触发
+    inputs:
+      minimal:
+        description: '诊断模式：构建极简 widget 树（定位栈溢出来源）'
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -69,7 +74,13 @@ jobs:
 
       - name: Build Linux release
         working-directory: bambu_lab_app
-        run: flutter build linux --release
+        run: |
+          EXTRA=""
+          if [ "${{ inputs.minimal }}" = "true" ]; then
+            EXTRA="--dart-define=MINIMAL=true"
+            echo ">>> 诊断模式：构建极简 widget 树"
+          fi
+          flutter build linux --release $EXTRA
 
       - name: Package build artifacts
         working-directory: bambu_lab_app
