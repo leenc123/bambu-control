@@ -34,6 +34,9 @@ jobs:
           # 关键：删掉 x64 引擎缓存，让 flutter 按当前主机架构(aarch64)重新下载
           rm -rf flutter/bin/cache
 
+          # 把 flutter 加入 PATH（只对后续步骤生效）
+          echo "$PWD/flutter/bin" >> "$GITHUB_PATH"
+
           # 首次运行会下载 linux-arm64 的 dart-sdk + 引擎
           # 注意：$GITHUB_PATH 只对后续步骤生效，本步骤内要用完整路径
           flutter/bin/flutter --version
