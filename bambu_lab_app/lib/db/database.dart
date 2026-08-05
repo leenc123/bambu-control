@@ -69,25 +69,33 @@ class AppDatabase extends _$AppDatabase {
       );
 
   static QueryExecutor _openConnection() {
-    // flutter-pi 无插件系统，Linux 下手动指定系统 sqlite3 库
-    if (Platform.isLinux) {
-      try {
-        open.overrideFor(
-          OperatingSystem.linux,
-          () => DynamicLibrary.open('libsqlite3.so.0'),
-        );
-      } catch (_) {
-        open.overrideFor(
-          OperatingSystem.linux,
-          () => DynamicLibrary.open('libsqlite3.so'),
-        );
-      }
-    }
-
     return LazyDatabase(() async {
       final docsDir = await getApplicationDocumentsDirectory();
       final file = File(p.join(docsDir.path, 'bambu_lab_app.sqlite'));
-      return NativeDatabase.createInBackground(file);
+      return NativeDatabase.createInBackground(
+        file,
+        // Linux 下手动指定系统 sqlite3 库。
+        // 必须在 isolateSetup 里设置：createInBackground 在独立 isolate
+        // 打开数据库，主 isolate 里的 overrideFor 对那边不可见
+        // （drift 文档：isolate 内无法访问主 isolate 的全局变量）。
+        // 若不加，sqlite3 包会误以为插件已把 sqlite3 打进进程，
+        // 从进程符号表查找 sqlite3_libversion_number 而失败。
+        isolateSetup: () {
+          if (Platform.isLinux) {
+            try {
+              open.overrideFor(
+                OperatingSystem.linux,
+                () => DynamicLibrary.open('libsqlite3.so.0'),
+              );
+            } catch (_) {
+              open.overrideFor(
+                OperatingSystem.linux,
+                () => DynamicLibrary.open('libsqlite3.so'),
+              );
+            }
+          }
+        },
+      );
     });
   }
 }
