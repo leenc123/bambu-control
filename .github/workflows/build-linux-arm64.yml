@@ -15,11 +15,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
+      - name: Install Flutter SDK (arm64 artifacts)
+        run: |
+          sudo apt-get install -y curl jq xz-utils
+
+          # 官方 stable tarball 只有 x64，但 engine 产物有 arm64（flutter#188932）
+          # 官方 workaround：下载 x64 包 → 删 bin/cache → 重新拉 arm64 引擎
+          RELEASES=$(curl -sS https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json)
+          VERSION=$(echo "$RELEASES" | jq -r '.current_release.stable')
+          ARCHIVE=$(echo "$RELEASES" | jq -r --arg v "$VERSION" \
+            '.releases[] | select(.hash==$v and .channel=="stable") | .archive')
+
+          echo "Flutter $VERSION → $ARCHIVE"
+
+          curl -sS "https://storage.googleapis.com/flutter_infra_release/releases/$ARCHIVE" \
+            | tar xJ
+
+          # 关键：删掉 x64 引擎缓存，让 flutter 按当前主机架构(aarch64)重新下载
+          rm -rf flutter/bin/cache
+          echo "$PWD/flutter/bin" >> "$GITHUB_PATH"
+
+          # 首次运行会下载 linux-arm64 的 dart-sdk + 引擎
+          flutter --version
 
       - name: Install Linux build dependencies
         run: |
