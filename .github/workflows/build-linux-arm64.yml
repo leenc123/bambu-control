@@ -132,6 +132,12 @@ jobs:
             "数据目录: ~/.local/share/bambu_lab_app/" \
             > "$ARTIFACT/README.txt"
 
+          # 构建信息：记录 git SHA，方便核对 artifact 是否来自最新代码
+          printf '%s\n' \
+            "build_sha=${{ github.sha }}" \
+            "build_time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" \
+            > "$ARTIFACT/build-info.txt"
+
           tar czf "${ARTIFACT}.tar.gz" "$ARTIFACT"
           echo "artifact_name=${ARTIFACT}.tar.gz" >> "$GITHUB_ENV"
 
