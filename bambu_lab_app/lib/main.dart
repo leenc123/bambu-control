@@ -52,26 +52,11 @@ void _installCrashLog() {
   };
 }
 
-/// 诊断开关：flutter build --dart-define=MINIMAL=true
-/// 构建一个极简 widget 树（无路由/主题/DB），用于二分定位
-/// "首帧构建栈溢出"（~580 层深挂载链）的来源。
-const bool kMinimalStartup = bool.fromEnvironment('MINIMAL');
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 白屏/黑屏排查：首个未捕获异常先落盘，避免级联刷屏
   _installCrashLog();
-
-  if (kMinimalStartup) {
-    // 极简树：若此包仍栈溢出 → 深树在框架层（MaterialApp/引擎）
-    // 若此包正常 → 深树在完整应用树（路由/主题/页面），继续二分
-    debugPrint('MINIMAL 模式：极简 widget 树');
-    runApp(const MaterialApp(
-      home: Scaffold(body: Center(child: Text('MINIMAL'))),
-    ));
-    return;
-  }
 
   final database = AppDatabase();
   DebugLog.setDatabase(database);
@@ -94,17 +79,6 @@ void main() async {
 
   // 启动初始化容错：DB/日志任何一步失败都不能阻止 UI 启动（避免黑屏）
   try {
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    // 完全隐藏状态栏 + 导航栏（沉浸式），适配挖孔屏
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky,
-        overlays: const []);
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-    ));
-
     await configProvider.loadPrinters();
     // 从数据库加载历史日志
     await DebugLog.loadFromDb();

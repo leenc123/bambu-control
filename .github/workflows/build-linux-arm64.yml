@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:  # 允许手动触发
-    inputs:
-      minimal:
-        description: '诊断模式：构建极简 widget 树（定位栈溢出来源）'
-        type: boolean
-        default: false
 
 jobs:
   build:
@@ -74,13 +69,7 @@ jobs:
 
       - name: Build Linux release
         working-directory: bambu_lab_app
-        run: |
-          EXTRA=""
-          if [ "${{ inputs.minimal }}" = "true" ]; then
-            EXTRA="--dart-define=MINIMAL=true"
-            echo ">>> 诊断模式：构建极简 widget 树"
-          fi
-          flutter build linux --release $EXTRA
+        run: flutter build linux --release
 
       - name: Package build artifacts
         working-directory: bambu_lab_app
@@ -91,47 +80,10 @@ jobs:
           mkdir -p "$ARTIFACT"
           cp -r "$BUNDLE_DIR"/* "$ARTIFACT/"
 
-          # ---- musl (postmarketOS/Alpine) 兼容性修复 ----
-          # sqlite3_flutter_libs 插件把 glibc 编译的完整 sqlite3 静态编进
-          # libsqlite3_flutter_libs_plugin.so，其引用 fcntl64 符号，在 musl
-          # 上不存在 → 启动时 "Error relocating ... symbol not found" 崩溃。
-          # 应用在 Linux 上使用系统 libsqlite3（lib/db/database.dart 的
-          # overrideFor），插件内 sqlite3 是死代码。原插件注册函数为空，
-          # 这里用 musl-gcc 编译一个同样只导出注册符号的空 stub 替换。
-          sudo apt-get install -y musl-tools
-          printf '%s\n' \
-            "void sqlite3_flutter_libs_plugin_register_with_registrar(void* registrar) {" \
-            "  (void)registrar;" \
-            "}" \
-            > /tmp/sqlite3_plugin_stub.c
-          musl-gcc -shared -fPIC \
-            -o "$ARTIFACT/lib/libsqlite3_flutter_libs_plugin.so" \
-            /tmp/sqlite3_plugin_stub.c
-          echo "--- sqlite3 plugin stub (musl aarch64) ---"
-          file "$ARTIFACT/lib/libsqlite3_flutter_libs_plugin.so"
-
-          # ---- musl 线程栈放大工具 ----
-          # musl 默认线程栈 128KB（glibc 8MB），glibc 编译的 Flutter 引擎
-          # 内部线程随机 Stack Overflow。libbigstack.so 通过 LD_PRELOAD
-          # 强制所有新线程 8MB 栈；stackcheck 用于确认线程栈大小。
-          musl-gcc -shared -fPIC \
-            -o "$ARTIFACT/libbigstack.so" \
-            tools/bigstack.c
-          musl-gcc -o "$ARTIFACT/stackcheck" tools/stackcheck.c
-          chmod +x "$ARTIFACT/stackcheck"
-          echo "--- built bigstack/stackcheck ---"
-          file "$ARTIFACT/libbigstack.so" "$ARTIFACT/stackcheck"
-
-          # 一键启动脚本：musl 下放大线程栈再启动
-          #   ulimit -s        → 主线程（exec 时内核按 RLIMIT_STACK 映射）
-          #   LD_PRELOAD       → 引擎 worker 线程（musl 默认仅 128KB）
+          # 一键启动脚本（Mobian / Debian glibc 环境直接启动）
           printf '%s\n' \
             "#!/bin/sh" \
             "cd \"\$(dirname \"\$0\")\" || exit 1" \
-            "# 主线程栈尽量放大（硬限制可能不允许，失败就忽略）" \
-            "ulimit -s 65536 2>/dev/null" \
-            "# 引擎内部线程栈强制 8MB（musl 默认 128KB 会随机 Stack Overflow）" \
-            "export LD_PRELOAD=\$PWD/libbigstack.so" \
             "exec ./bambu_lab_app \"\$@\"" \
             > "$ARTIFACT/run.sh"
           chmod +x "$ARTIFACT/run.sh"
@@ -139,16 +91,10 @@ jobs:
           printf '%s\n' \
             "Bambu Lab App — Linux ARM64" \
             "" \
-            "运行方法（在 postmarketOS / ARM Linux 设备上）:" \
-            "  1) 先确认线程栈大小: ./stackcheck" \
-            "     (musl 默认 128KB，正常应显示 8MB 级别)" \
-            "  2) 用大栈启动（关键！musl 线程栈太小导致随机 Stack Overflow）:" \
-            "     LD_PRELOAD=\$PWD/libbigstack.so ./bambu_lab_app" \
-            "     或: sh run.sh" \
+            "运行方法（Mobian / Debian 系 ARM 设备）:" \
+            "  ./run.sh  或  ./bambu_lab_app" \
             "" \
             "依赖（如果运行报错缺少 .so）:" \
-            "  sudo apk add gtk+3.0 libstdc++ sqlite-libs" \
-            "  # 或 Debian 系:" \
             "  sudo apt-get install libgtk-3-0 libsqlite3-0" \
             "" \
             "数据目录: ~/.local/share/bambu_lab_app/" \
