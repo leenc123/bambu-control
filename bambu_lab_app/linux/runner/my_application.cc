@@ -11,14 +11,23 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
+// Phosh/触摸设备上没有鼠标指针，gdk_display_get_primary_monitor() 会返回
+// NULL（"primary" 按指针位置定义）。手机只有一块屏幕，直接取第 0 块。
+static GdkMonitor* get_first_monitor() {
+  GdkDisplay* display = gdk_display_get_default();
+  if (display == nullptr || gdk_display_get_n_monitors(display) < 1) {
+    return nullptr;
+  }
+  return gdk_display_get_monitor(display, 0);
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   GtkWindow* window = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(view)));
   // 双保险：把 Flutter 视图尺寸强制为显示器输出尺寸。
   // Wayland 全屏下若 surface 尺寸与面板比例不符，合成器会等比缩放
   // 留黑边（如默认 1280x720 横屏 surface 在 720x1280 竖屏面板上）。
-  GdkMonitor* monitor =
-      gdk_display_get_primary_monitor(gdk_display_get_default());
+  GdkMonitor* monitor = get_first_monitor();
   if (monitor != nullptr) {
     GdkRectangle geometry;
     gdk_monitor_get_geometry(monitor, &geometry);
@@ -46,8 +55,7 @@ static void my_application_activate(GApplication* application) {
 
   // 窗口默认尺寸 = 显示器逻辑尺寸（scale 2 下 720x1280 物理面板 = 360x640 逻辑）。
   // 不写死 1280x720：横屏默认尺寸在竖屏面板上会被等比缩放，留上下黑边。
-  GdkMonitor* monitor =
-      gdk_display_get_primary_monitor(gdk_display_get_default());
+  GdkMonitor* monitor = get_first_monitor();
   if (monitor != nullptr) {
     GdkRectangle geometry;
     gdk_monitor_get_geometry(monitor, &geometry);
