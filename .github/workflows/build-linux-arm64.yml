@@ -109,11 +109,21 @@ jobs:
             > "$ARTIFACT/run.sh"
           chmod +x "$ARTIFACT/run.sh"
 
+          # 开机自启动脚本（解压后配合 ~/.config/autostart 使用，见 README）
+          if [ -f tools/mobian_autostart.sh ]; then
+            cp tools/mobian_autostart.sh "$ARTIFACT/"
+            chmod +x "$ARTIFACT/mobian_autostart.sh"
+          fi
+
           printf '%s\n' \
             "Bambu Lab App — Linux ARM64" \
             "" \
             "运行方法（Mobian / Debian 系 ARM 设备）:" \
             "  ./run.sh  或  ./bambu_lab_app" \
+            "" \
+            "开机自启动: chmod +x mobian_autostart.sh，创建" \
+            "  ~/.config/autostart/bambu-lab-app.desktop 指向它" \
+            "  （脚本内有安装说明）" \
             "" \
             "依赖（如果运行报错缺少 .so）:" \
             "  sudo apt-get install libgtk-3-0 libsqlite3-0" \
