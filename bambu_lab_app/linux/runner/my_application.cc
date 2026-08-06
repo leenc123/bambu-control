@@ -44,7 +44,15 @@ static void my_application_activate(GApplication* application) {
   gtk_window_set_decorated(window, FALSE);
   gtk_window_set_title(window, "");
 
-  gtk_window_set_default_size(window, 1280, 720);
+  // 窗口默认尺寸 = 显示器逻辑尺寸（scale 2 下 720x1280 物理面板 = 360x640 逻辑）。
+  // 不写死 1280x720：横屏默认尺寸在竖屏面板上会被等比缩放，留上下黑边。
+  GdkMonitor* monitor =
+      gdk_display_get_primary_monitor(gdk_display_get_default());
+  if (monitor != nullptr) {
+    GdkRectangle geometry;
+    gdk_monitor_get_geometry(monitor, &geometry);
+    gtk_window_set_default_size(window, geometry.width, geometry.height);
+  }
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
@@ -64,9 +72,19 @@ static void my_application_activate(GApplication* application) {
   g_signal_connect_swapped(view, "first-frame", G_CALLBACK(first_frame_cb),
                            self);
 
-  // Kiosk 模式：先全屏并显示窗口，再 realize 视图——首帧直接按
-  // 屏幕尺寸渲染。若等首帧（默认 1280x720 横屏）画完再全屏，
-  // Wayland 下 surface 不跟随 resize，竖屏面板上会等比缩放留黑边。
+  // Kiosk 模式：视图尺寸 = 显示器逻辑尺寸，首帧直接按面板尺寸渲染；
+  // 再 fullscreen + show。若 Phosh 老版本 fullscreen 失效，窗口本身
+  // 就是面板尺寸，仍然铺满（scale 2 下 720x1280 面板 = 360x640 逻辑）。
+  {
+    GdkMonitor* monitor =
+        gdk_display_get_primary_monitor(gdk_display_get_default());
+    if (monitor != nullptr) {
+      GdkRectangle geometry;
+      gdk_monitor_get_geometry(monitor, &geometry);
+      gtk_widget_set_size_request(GTK_WIDGET(view), geometry.width,
+                                  geometry.height);
+    }
+  }
   gtk_window_fullscreen(window);
   gtk_widget_show(GTK_WIDGET(window));
 

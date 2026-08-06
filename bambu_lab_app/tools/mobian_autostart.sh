@@ -57,6 +57,8 @@ gsettings set org.gnome.desktop.session idle-delay 0 2>/dev/null
 gsettings set org.gnome.settings-daemon.plugins.power idle-dim false 2>/dev/null
 gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null
 gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null
+# 电源键不做任何动作（kiosk：按了不锁屏不挂起）
+gsettings set org.gnome.settings-daemon.plugins.power power-button-action 'nothing' 2>/dev/null
 log "kiosk settings applied (lock disabled, screen always on)"
 
 # 3) 启动 + 崩溃自动重启
