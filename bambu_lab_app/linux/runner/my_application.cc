@@ -25,7 +25,12 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
     gtk_widget_set_size_request(GTK_WIDGET(view), geometry.width,
                                 geometry.height);
   }
-  gtk_widget_show(GTK_WIDGET(window));
+
+  // 调试信息：打印窗口实际尺寸，确认是否等于面板尺寸。
+  // 会出现在 ~/.cache/bambu_lab_app/autostart.log 里。
+  gint width = 0, height = 0;
+  gtk_window_get_size(window, &width, &height);
+  g_print("BAMBU-DEBUG: window=%dx%d\n", width, height);
 }
 
 // Implements GApplication::activate.
@@ -59,10 +64,11 @@ static void my_application_activate(GApplication* application) {
   g_signal_connect_swapped(view, "first-frame", G_CALLBACK(first_frame_cb),
                            self);
 
-  // Kiosk 模式：在首帧渲染前就全屏，让 Flutter surface 从一开始
-  // 就等于屏幕尺寸；若等首帧（默认 1280x720 横屏）画完再全屏，
-  // 竖屏面板上会等比缩放留黑边。
+  // Kiosk 模式：先全屏并显示窗口，再 realize 视图——首帧直接按
+  // 屏幕尺寸渲染。若等首帧（默认 1280x720 横屏）画完再全屏，
+  // Wayland 下 surface 不跟随 resize，竖屏面板上会等比缩放留黑边。
   gtk_window_fullscreen(window);
+  gtk_widget_show(GTK_WIDGET(window));
 
   gtk_widget_realize(GTK_WIDGET(view));
 
