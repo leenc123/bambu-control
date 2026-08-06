@@ -48,7 +48,8 @@ fail=0
 while true; do
     log "launching $SCRIPT_DIR/run.sh"
     t0=$(date +%s)
-    "$SCRIPT_DIR/run.sh" >> "$LOG" 2>&1
+    # 用 sh 显式调用，避免解压工具剥掉 run.sh 执行位时启动失败
+    sh "$SCRIPT_DIR/run.sh" >> "$LOG" 2>&1
     code=$?
     t1=$(date +%s)
     runtime=$((t1 - t0))

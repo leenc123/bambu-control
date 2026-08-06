@@ -120,6 +120,7 @@ jobs:
             "" \
             "运行方法（Mobian / Debian 系 ARM 设备）:" \
             "  ./run.sh  或  ./bambu_lab_app" \
+            "窗口: 默认全屏无边框（kiosk 模式）" \
             "" \
             "开机自启动: chmod +x mobian_autostart.sh，创建" \
             "  ~/.config/autostart/bambu-lab-app.desktop 指向它" \

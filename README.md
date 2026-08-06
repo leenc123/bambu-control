@@ -30,7 +30,8 @@
 │   │   │   └── debug_log_viewer.dart   # 日志查看弹窗
 │   │   └── theme/                      # Neumorphism 主题
 │   └── tools/
-│       └── bambu_printer_simulator.py  # 打印机模拟器（MQTT + FTP）
+│       ├── bambu_printer_simulator.py  # 打印机模拟器（MQTT + FTP）
+│       └── mobian_autostart.sh         # Mobian 开机自启脚本
 │
 ├── bambulabs_api/           # Python 打印机 API 库（参考实现）
 │   └── bambulabs_api/
@@ -64,7 +65,7 @@
 | 状态管理 | Provider |
 | 数据库 | drift (SQLite) |
 | 主题 | Neumorphism（软拟物） |
-| 目标平台 | Android / iOS / Windows |
+| 目标平台 | Android / iOS / Windows / Linux ARM64（Mobian） |
 
 ### 功能
 
@@ -153,6 +154,69 @@ print(printer.get_percentage())
 - 所有命令必须包含 `sequence_id`
 - 编码兼容性：偶发非 UTF-8 字节需 Latin-1 兜底
 - Client ID 每次连接唯一，避免 session 残留
+
+---
+
+## Mobian 设备部署（Linux ARM64）
+
+目标设备：Mobian（Debian 11，glibc 2.31）+ Phosh 图形界面（如红米 2 / WT88047）。
+App 以标准 Flutter Linux GTK 桌面形式运行（非 flutter-pi），开机自启即全屏 kiosk。
+
+### 构建（CI 自动打包）
+
+- 推送代码后 GitHub Actions `build-linux-arm64.yml` 自动构建，产物
+  `bambu-lab-app-linux-arm64.tar.gz`（Actions 页面 → Artifacts 下载）。
+- **构建环境是 debian:bullseye 容器（glibc 2.31）**，与 Mobian 一致。
+  不要改成更新的 runner 系统镜像——glibc 符号版本会超过手机，
+  启动时报 `version GLIBC_2.3x not found`。
+
+### 安装
+
+```bash
+cd ~
+tar xzf bambu-lab-app-linux-arm64.tar.gz   # 必须用 tar 解压（GUI 解压会剥执行位）
+
+# 依赖（Mobian 一般已装，缺了才装）
+sudo apt install -y libgtk-3-0 libsqlite3-0
+
+# 修复执行位（tar 解压一般无需，GUI 解压必需）
+chmod +x ~/bambu-lab-app-linux-arm64/bambu_lab_app \
+         ~/bambu-lab-app-linux-arm64/run.sh \
+         ~/bambu-lab-app-linux-arm64/mobian_autostart.sh
+
+# 手动启动（必须在 Phosh 图形界面终端里；SSH 无显示会话会段错误）
+cd ~/bambu-lab-app-linux-arm64 && ./run.sh
+```
+
+窗口默认全屏无边框（kiosk 模式）。
+
+### 开机自启动
+
+```bash
+mkdir -p ~/.config/autostart
+printf '%s\n' \
+  "[Desktop Entry]" \
+  "Type=Application" \
+  "Name=Bambu Lab" \
+  "Exec=sh /home/mobian/bambu-lab-app-linux-arm64/mobian_autostart.sh" \
+  "Terminal=false" \
+  "X-GNOME-Autostart-enabled=true" \
+  > ~/.config/autostart/bambu-lab-app.desktop
+```
+
+- 自启脚本行为：等 Wayland 就绪 → 启动应用 → 崩溃自动重启
+  （连续 5 次 5 秒内崩溃则放弃），日志：`~/.cache/bambu_lab_app/autostart.log`
+- 卸载自启：`rm ~/.config/autostart/bambu-lab-app.desktop`
+
+### 常见问题
+
+| 现象 | 原因 | 对策 |
+|------|------|------|
+| `version GLIBC_2.3x not found` | 包不是 bullseye 容器构建 | 用最新 CI 产物 |
+| 启动即段错误 | SSH 运行（无显示会话） | 在 Phosh 终端里跑 |
+| `./run.sh: 权限不够` | 解压剥了执行位 | `chmod +x` 或改用 tar 解压 |
+| DartWorker 线程 sqlite3 段错误 | 旧包（sqlite3 双副本 bug） | 重新下载最新包 |
+| 自启没反应 | 脚本无执行位 / Exec 路径错 | `chmod +x`；检查 .desktop |
 
 ---
 
