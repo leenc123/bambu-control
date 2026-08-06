@@ -51,6 +51,11 @@ static void my_application_activate(GApplication* application) {
   if (monitor != nullptr) {
     GdkRectangle geometry;
     gdk_monitor_get_geometry(monitor, &geometry);
+    // 调试：GDK 上报的显示器逻辑尺寸与缩放（autostart.log 可查）。
+    // 预期 720x1280 面板 + scale 2 = 360x640；若返回 1280x720 说明
+    // GDK 给的是物理像素，需要按 scale 换算。
+    g_print("BAMBU-DEBUG: monitor=%dx%d scale=%d\n", geometry.width,
+            geometry.height, gdk_monitor_get_scale_factor(monitor));
     gtk_window_set_default_size(window, geometry.width, geometry.height);
   }
 
