@@ -21,6 +21,23 @@ static GdkMonitor* get_first_monitor() {
   return gdk_display_get_monitor(display, 0);
 }
 
+// Phosh 启动竞态：窗口首次 map 时 fullscreen 状态可能被丢弃
+// （窗口停在工作区尺寸，顶部露出系统栏；锁屏/解锁后能铺满说明
+// fullscreen 本身有效，只是启动时丢了请求）。map 后重发一次。
+static void on_window_map(GtkWidget* widget, gpointer user_data) {
+  gtk_window_fullscreen(GTK_WINDOW(widget));
+}
+
+// 延迟兜底：map 后 Phosh 若仍未应用全屏，1.2 秒后再补一次，并打印尺寸。
+static gboolean fullscreen_later(gpointer user_data) {
+  GtkWindow* window = GTK_WINDOW(user_data);
+  gtk_window_fullscreen(window);
+  gint width = 0, height = 0;
+  gtk_window_get_size(window, &width, &height);
+  g_print("BAMBU-DEBUG: after-fullscreen window=%dx%d\n", width, height);
+  return G_SOURCE_REMOVE;
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   GtkWindow* window = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(view)));
@@ -100,6 +117,11 @@ static void my_application_activate(GApplication* application) {
   }
   gtk_window_fullscreen(window);
   gtk_widget_show(GTK_WIDGET(window));
+
+  // 启动竞态兜底：map 后重发 fullscreen + 1.2s 延迟补发。
+  // 不依赖首帧时序，确保开机自启时也能最终铺满全屏。
+  g_signal_connect(window, "map", G_CALLBACK(on_window_map), nullptr);
+  g_timeout_add(1200, fullscreen_later, window);
 
   gtk_widget_realize(GTK_WIDGET(view));
 
