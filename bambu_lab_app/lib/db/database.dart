@@ -1,14 +1,12 @@
 /// Drift 数据库定义 - 打印机配置存储
 library;
 
-import 'dart:ffi';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:sqlite3/open.dart';
 
 import 'printer_dao.dart';
 import 'debug_log_dao.dart';
@@ -72,30 +70,16 @@ class AppDatabase extends _$AppDatabase {
     return LazyDatabase(() async {
       final docsDir = await getApplicationDocumentsDirectory();
       final file = File(p.join(docsDir.path, 'bambu_lab_app.sqlite'));
-      return NativeDatabase.createInBackground(
-        file,
-        // Linux 下手动指定系统 sqlite3 库。
-        // 必须在 isolateSetup 里设置：createInBackground 在独立 isolate
-        // 打开数据库，主 isolate 里的 overrideFor 对那边不可见
-        // （drift 文档：isolate 内无法访问主 isolate 的全局变量）。
-        // 若不加，sqlite3 包会误以为插件已把 sqlite3 打进进程，
-        // 从进程符号表查找 sqlite3_libversion_number 而失败。
-        isolateSetup: () {
-          if (Platform.isLinux) {
-            try {
-              open.overrideFor(
-                OperatingSystem.linux,
-                () => DynamicLibrary.open('libsqlite3.so.0'),
-              );
-            } catch (_) {
-              open.overrideFor(
-                OperatingSystem.linux,
-                () => DynamicLibrary.open('libsqlite3.so'),
-              );
-            }
-          }
-        },
-      );
+      // Linux 桌面（GTK 插件系统）下让 sqlite3_flutter_libs 插件以
+      // 单副本提供 sqlite3：插件 .so 在引擎启动时 dlopen，符号进入进程
+      // 全局表，后台 isolate 也能解析到（drift 官方 Linux 路径）。
+      //
+      // 不要 overrideFor 系统 libsqlite3：会和插件内静态编译的 sqlite3
+      // 形成双副本，两个副本的 sqlite3GlobalConfig 符号冲突混用，
+      // sqlite3_initialize 内部调用空指针 → DartWorker 线程段错误。
+      // （overrideFor 是 flutter-pi 时代的方案——flutter-pi 无插件系统，
+      // 不会 dlopen 插件库，只有系统库一个副本；GTK 桌面版不需要。）
+      return NativeDatabase.createInBackground(file);
     });
   }
 }
