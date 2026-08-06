@@ -30,6 +30,12 @@ jobs:
           apt-get install -y --no-install-recommends \
             curl jq xz-utils unzip git ca-certificates
 
+          # 容器内以 root 运行，但挂载的工作区属于 runner 用户，
+          # git 会报 "dubious ownership"。提前把工作区（含 flutter SDK
+          # 这个独立 git 仓库）标记为安全目录。
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/flutter"
+
       - name: Checkout
         uses: actions/checkout@v4
 
