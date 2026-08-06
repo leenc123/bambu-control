@@ -204,7 +204,8 @@ printf '%s\n' \
   > ~/.config/autostart/bambu-lab-app.desktop
 ```
 
-- 自启脚本行为：等 Wayland 就绪 → 启动应用 → 崩溃自动重启
+- 自启脚本行为：等 Wayland 就绪 → 应用 kiosk 设置（禁用锁屏 + 屏幕常亮，幂等）
+  → 启动应用 → 崩溃自动重启
   （连续 5 次 5 秒内崩溃则放弃），日志：`~/.cache/bambu_lab_app/autostart.log`
 - 卸载自启：`rm ~/.config/autostart/bambu-lab-app.desktop`
 

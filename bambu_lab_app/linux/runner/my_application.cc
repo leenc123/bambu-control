@@ -14,9 +14,17 @@ G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   GtkWindow* window = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(view)));
-  // Kiosk 模式：首帧渲染后直接全屏（无边框已在 activate 中设置）。
-  // 运行在手机/嵌入式 Linux 上，开机自启后即是全屏控制面板。
-  gtk_window_fullscreen(window);
+  // 双保险：把 Flutter 视图尺寸强制为显示器输出尺寸。
+  // Wayland 全屏下若 surface 尺寸与面板比例不符，合成器会等比缩放
+  // 留黑边（如默认 1280x720 横屏 surface 在 720x1280 竖屏面板上）。
+  GdkMonitor* monitor =
+      gdk_display_get_primary_monitor(gdk_display_get_default());
+  if (monitor != nullptr) {
+    GdkRectangle geometry;
+    gdk_monitor_get_geometry(monitor, &geometry);
+    gtk_widget_set_size_request(GTK_WIDGET(view), geometry.width,
+                                geometry.height);
+  }
   gtk_widget_show(GTK_WIDGET(window));
 }
 
@@ -50,6 +58,12 @@ static void my_application_activate(GApplication* application) {
   // Requires the view to be realized so we can start rendering.
   g_signal_connect_swapped(view, "first-frame", G_CALLBACK(first_frame_cb),
                            self);
+
+  // Kiosk 模式：在首帧渲染前就全屏，让 Flutter surface 从一开始
+  // 就等于屏幕尺寸；若等首帧（默认 1280x720 横屏）画完再全屏，
+  // 竖屏面板上会等比缩放留黑边。
+  gtk_window_fullscreen(window);
+
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));

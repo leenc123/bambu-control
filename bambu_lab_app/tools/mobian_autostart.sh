@@ -5,7 +5,8 @@
 # 特性：
 #   1. 等待 Wayland 会话就绪（Phosh 可能在 compositor 就绪前触发 autostart）
 #   2. 应用崩溃后自动重启（连续 5 次 5 秒内崩溃则放弃，避免崩溃循环刷屏）
-#   3. 日志写入 ~/.cache/bambu_lab_app/autostart.log
+#   3. kiosk 设置：禁用锁屏 + 屏幕常亮（幂等，每次启动都强制执行）
+#   4. 日志写入 ~/.cache/bambu_lab_app/autostart.log
 #
 # 安装（在手机上执行，把 mobian_autostart.sh 放在 app 解压目录里）:
 #   chmod +x mobian_autostart.sh
@@ -43,7 +44,22 @@ done
 
 log "=== autostart: WAYLAND_DISPLAY=$WAYLAND_DISPLAY ==="
 
-# 2) 启动 + 崩溃自动重启
+# 2) kiosk 设置：禁用锁屏 + 屏幕常亮
+# 幂等：每次启动都确保最终状态，gsettings 失败不影响应用启动。
+# - idle-activation-enabled false → 空闲时完全不激活屏保/锁屏（总开关）
+# - lock-enabled false            → 屏幕熄灭后不再要求解锁
+# - idle-delay 0                  → 永不熄屏（kiosk 常亮）
+# - idle-dim false                → 不自动调暗
+# - sleep-inactive-* nothing      → 不自动挂起（AC 与电池）
+gsettings set org.gnome.desktop.screensaver idle-activation-enabled false 2>/dev/null
+gsettings set org.gnome.desktop.screensaver lock-enabled false 2>/dev/null
+gsettings set org.gnome.desktop.session idle-delay 0 2>/dev/null
+gsettings set org.gnome.settings-daemon.plugins.power idle-dim false 2>/dev/null
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null
+log "kiosk settings applied (lock disabled, screen always on)"
+
+# 3) 启动 + 崩溃自动重启
 fail=0
 while true; do
     log "launching $SCRIPT_DIR/run.sh"
