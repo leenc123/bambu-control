@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:bambu_lab_app/providers/printer_provider.dart';
+import 'package:flutter_onscreen_keyboard/flutter_onscreen_keyboard.dart';
 
 class ControlScreen extends StatelessWidget {
   const ControlScreen({super.key});
@@ -262,7 +263,7 @@ class _TempInputRow extends StatelessWidget {
         ),
         SizedBox(
           width: 80,
-          child: TextField(
+          child: OnscreenKeyboardTextField(
             controller: controller,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
@@ -469,7 +470,7 @@ class _GcodeTerminalState extends State<_GcodeTerminal> {
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: OnscreenKeyboardTextField(
                   controller: _controller,
                   decoration: InputDecoration(
                     hintText: '输入 G-code (如 G28)',

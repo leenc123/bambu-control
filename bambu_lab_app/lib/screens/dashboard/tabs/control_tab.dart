@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:bambu_lab_app/providers/ams_provider.dart';
 import 'package:bambu_lab_app/providers/printer_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
+import 'package:flutter_onscreen_keyboard/flutter_onscreen_keyboard.dart';
 
 class ControlTab extends StatelessWidget {
   const ControlTab({super.key, required this.printer});
@@ -204,7 +205,7 @@ class _TempInputsState extends State<_TempInputs> {
       Expanded(child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: c.textPrimary))),
       SizedBox(
         width: 64,
-        child: TextField(
+        child: OnscreenKeyboardTextField(
           controller: ctrl,
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
@@ -490,7 +491,7 @@ class _GcodeTerminalState extends State<_GcodeTerminal> {
         ],
         Row(children: [
           Expanded(
-            child: TextField(
+            child: OnscreenKeyboardTextField(
               controller: _ctrl,
               style: TextStyle(fontFamily: 'monospace', fontSize: 13, color: c.textPrimary),
               decoration: InputDecoration(
@@ -792,7 +793,7 @@ class _TempInputState extends State<_TempInput> {
       const SizedBox(width: 6),
       SizedBox(
         width: 60,
-        child: TextField(
+        child: OnscreenKeyboardTextField(
           controller: _ctrl,
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
@@ -844,7 +845,7 @@ class _LengthInputState extends State<_LengthInput> {
       const SizedBox(width: 6),
       SizedBox(
         width: 50,
-        child: TextField(
+        child: OnscreenKeyboardTextField(
           controller: _ctrl,
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,

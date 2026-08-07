@@ -14,6 +14,7 @@ import 'package:bambu_lab_app/screens/dashboard/dashboard_screen.dart';
 import 'package:bambu_lab_app/screens/home/home_screen.dart';
 import 'package:bambu_lab_app/screens/splash/splash_screen.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
+import 'package:flutter_onscreen_keyboard/flutter_onscreen_keyboard.dart';
 
 class BambuLabApp extends StatelessWidget {
   const BambuLabApp({super.key});
@@ -74,8 +75,23 @@ class BambuLabApp extends StatelessWidget {
                           // 可禁用旋转（排查黑屏/方向问题时用，无需重建）。
                           child: (Platform.isLinux &&
                                   Platform.environment['BAMBU_NO_ROTATE'] != '1')
-                              ? RotatedBox(quarterTurns: 1, child: child!)
-                              : child!,
+                              ? RotatedBox(
+                                  quarterTurns: 1,
+                                  child: OnscreenKeyboard(
+                                    // 固定宽度避免 MediaQuery 在 Overlay 上下文
+                                    // 不准导致键盘溢出屏幕边缘
+                                    width: (_) => 360,
+                                    theme: const OnscreenKeyboardThemeData(
+                                        useSafeArea: false),
+                                    child: child!,
+                                  ),
+                                )
+                              : OnscreenKeyboard(
+                                  width: (_) => 360,
+                                  theme: const OnscreenKeyboardThemeData(
+                                      useSafeArea: false),
+                                  child: child!,
+                                ),
                         ),
                       ),
                       if (ss.isActive)

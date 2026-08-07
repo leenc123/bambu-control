@@ -38,6 +38,8 @@ dependencies:
   share_plus: ^10.1.4
   # ZIP archive handling (for .3mf thumbnail extraction)
   archive: ^3.6.1
+  # On-screen virtual keyboard (kiosk/嵌入式无系统键盘时输入)
+  flutter_onscreen_keyboard: ^0.4.7
 
 dev_dependencies:
   flutter_test:
