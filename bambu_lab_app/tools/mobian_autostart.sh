@@ -59,6 +59,18 @@ gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'no
 gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' 2>/dev/null
 # 电源键不做任何动作（kiosk：按了不锁屏不挂起）
 gsettings set org.gnome.settings-daemon.plugins.power power-button-action 'nothing' 2>/dev/null
+
+# 锁屏 PAM 放行：Phosh 锁屏调用 pam_start("phosh")（源码 auth.c 确认），
+# 无 /etc/pam.d/phosh 时 fallback 到通用栈 → 锁屏要用户密码。
+# 建文件放行后锁屏任意输入都能解锁，用户密码 / SSH 密码原样保留。
+# 依赖 sudo 免密（安装说明里有 /etc/sudoers.d/mobian-kiosk）。
+if [ ! -f /etc/pam.d/phosh ] || ! grep -q pam_permit /etc/pam.d/phosh; then
+  printf '%s\n' \
+    "auth sufficient pam_permit.so" \
+    "account sufficient pam_permit.so" \
+    | sudo tee /etc/pam.d/phosh >/dev/null 2>&1
+  log "pam phosh permit applied"
+fi
 log "kiosk settings applied (lock disabled, screen always on)"
 
 # 3) 启动 + 崩溃自动重启

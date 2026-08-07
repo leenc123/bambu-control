@@ -11,16 +11,6 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
-// Phosh/触摸设备上没有鼠标指针，gdk_display_get_primary_monitor() 会返回
-// NULL（"primary" 按指针位置定义）。手机只有一块屏幕，直接取第 0 块。
-static GdkMonitor* get_first_monitor() {
-  GdkDisplay* display = gdk_display_get_default();
-  if (display == nullptr || gdk_display_get_n_monitors(display) < 1) {
-    return nullptr;
-  }
-  return gdk_display_get_monitor(display, 0);
-}
-
 // Phosh 启动竞态：窗口首次 map 时 fullscreen 状态可能被丢弃
 // （窗口停在工作区尺寸，顶部露出系统栏；锁屏/解锁后能铺满说明
 // fullscreen 本身有效，只是启动时丢了请求）。map 后重发一次。
@@ -41,19 +31,8 @@ static gboolean fullscreen_later(gpointer user_data) {
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   GtkWindow* window = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(view)));
-  // 双保险：把 Flutter 视图尺寸强制为显示器输出尺寸。
-  // Wayland 全屏下若 surface 尺寸与面板比例不符，合成器会等比缩放
-  // 留黑边（如默认 1280x720 横屏 surface 在 720x1280 竖屏面板上）。
-  GdkMonitor* monitor = get_first_monitor();
-  if (monitor != nullptr) {
-    GdkRectangle geometry;
-    gdk_monitor_get_geometry(monitor, &geometry);
-    gtk_widget_set_size_request(GTK_WIDGET(view), geometry.width,
-                                geometry.height);
-  }
-
   // 调试信息：打印窗口实际尺寸，确认是否等于面板尺寸。
-  // 会出现在 ~/.cache/bambu_lab_app/autostart.log 里。
+  // 会出现在 journal（kiosk 模式）或 autostart.log（Phosh 模式）里。
   gint width = 0, height = 0;
   gtk_window_get_size(window, &width, &height);
   g_print("BAMBU-DEBUG: window=%dx%d\n", width, height);
@@ -70,18 +49,18 @@ static void my_application_activate(GApplication* application) {
   gtk_window_set_decorated(window, FALSE);
   gtk_window_set_title(window, "");
 
-  // 窗口默认尺寸 = 显示器逻辑尺寸（scale 2 下 720x1280 物理面板 = 360x640 逻辑）。
-  // 不写死 1280x720：横屏默认尺寸在竖屏面板上会被等比缩放，留上下黑边。
-  GdkMonitor* monitor = get_first_monitor();
+  // 默认尺寸随便给（fullscreen 会覆盖）。不再按 monitor 几何强制尺寸——
+  // kiosk (phoc) 下 GDK 几何可能与旋转后的输出不一致，强制会让视图
+  // 尺寸错位（半边黑）。pure fullscreen 由合成器决定最终尺寸。
+  gtk_window_set_default_size(window, 1280, 720);
+
+  // 调试：GDK 上报的显示器几何与缩放（journal/autostart.log 可查）。
+  GdkMonitor* monitor = gdk_display_get_monitor(gdk_display_get_default(), 0);
   if (monitor != nullptr) {
     GdkRectangle geometry;
     gdk_monitor_get_geometry(monitor, &geometry);
-    // 调试：GDK 上报的显示器逻辑尺寸与缩放（autostart.log 可查）。
-    // 预期 720x1280 面板 + scale 2 = 360x640；若返回 1280x720 说明
-    // GDK 给的是物理像素，需要按 scale 换算。
     g_print("BAMBU-DEBUG: monitor=%dx%d scale=%d\n", geometry.width,
             geometry.height, gdk_monitor_get_scale_factor(monitor));
-    gtk_window_set_default_size(window, geometry.width, geometry.height);
   }
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
@@ -102,19 +81,8 @@ static void my_application_activate(GApplication* application) {
   g_signal_connect_swapped(view, "first-frame", G_CALLBACK(first_frame_cb),
                            self);
 
-  // Kiosk 模式：视图尺寸 = 显示器逻辑尺寸，首帧直接按面板尺寸渲染；
-  // 再 fullscreen + show。若 Phosh 老版本 fullscreen 失效，窗口本身
-  // 就是面板尺寸，仍然铺满（scale 2 下 720x1280 面板 = 360x640 逻辑）。
-  {
-    GdkMonitor* monitor =
-        gdk_display_get_primary_monitor(gdk_display_get_default());
-    if (monitor != nullptr) {
-      GdkRectangle geometry;
-      gdk_monitor_get_geometry(monitor, &geometry);
-      gtk_widget_set_size_request(GTK_WIDGET(view), geometry.width,
-                                  geometry.height);
-    }
-  }
+  // Kiosk 模式：fullscreen + show，尺寸交给合成器（不再手动强制，
+  // 避免 GDK 几何与旋转后输出不一致导致的半边黑）。
   gtk_window_fullscreen(window);
   gtk_widget_show(GTK_WIDGET(window));
 
