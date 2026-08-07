@@ -159,8 +159,9 @@ print(printer.get_percentage())
 
 ## Mobian 设备部署（Linux ARM64）
 
-目标设备：Mobian（Debian 11，glibc 2.31）+ Phosh 图形界面（如红米 2 / WT88047）。
-App 以标准 Flutter Linux GTK 桌面形式运行（非 flutter-pi），开机自启即全屏 kiosk。
+目标设备：Mobian（Debian 11/12，glibc ≥2.31）+ 红米 2 / WT88047。
+App 以标准 Flutter Linux GTK 桌面形式运行（非 flutter-pi）。
+**推荐 kiosk 模式**（phoc 直接跑应用，绕过 Phosh 锁屏），也可保留 Phosh 桌面。
 
 ### 构建（CI 自动打包）
 
@@ -190,7 +191,86 @@ cd ~/bambu-lab-app-linux-arm64 && ./run.sh
 
 窗口默认全屏无边框（kiosk 模式）。
 
-### 开机自启动
+### 开机自启（两种模式）
+
+#### 模式 A：Kiosk 模式（推荐，生产用）
+
+**直接跳过 Phosh 桌面和锁屏**：用 phoc（合成器）+ squeekboard + 应用组成自助面板。
+没有 Phosh 就没有锁屏——这是绕开"开机锁屏密码"的正解（老版本 Phosh 的锁屏
+无官方开关，gsettings/DBus/PAM 都绕不过）。
+
+```bash
+# 1. 停用 Phosh（避免和 kiosk 抢 tty7）
+sudo systemctl disable phosh.service
+
+# 2. 创建 kiosk 服务
+sudo tee /etc/systemd/system/bambu-kiosk.service <<'EOF'
+[Unit]
+Description=Bambu Lab Kiosk (phoc + app)
+After=systemd-user-sessions.service
+Conflicts=getty@tty7.service
+After=getty@tty7.service
+After=rc-local.service plymouth-quit-wait.service
+Wants=dbus.socket
+After=dbus.socket
+After=session-c1.scope
+Before=graphical.target
+ConditionPathExists=/dev/tty0
+
+[Service]
+Environment=WLR_BACKENDS=drm,libinput
+ExecStart=/usr/bin/phoc -S -C /etc/phosh/phoc.ini -E "bash -lc 'squeekboard & /home/mobian/bambu-lab-app-linux-arm64/run.sh'"
+Restart=always
+RestartSec=3
+User=1000
+PAMName=login
+WorkingDirectory=~
+TTYPath=/dev/tty7
+TTYReset=yes
+TTYVHangup=yes
+StandardInput=tty-fail
+StandardOutput=append:/tmp/bambu-kiosk.log
+StandardError=append:/tmp/bambu-kiosk.log
+UtmpIdentifier=tty7
+UtmpMode=user
+
+[Install]
+WantedBy=graphical.target
+EOF
+
+# 3. phoc 输出配置（竖屏输出；不要加 rotate，见下方说明）
+sudo mkdir -p /etc/phosh
+sudo tee /etc/phosh/phoc.ini <<'EOF'
+[output:DSI-1]
+scale = 2
+EOF
+
+# 4. 启用 + 重启
+sudo systemctl daemon-reload
+sudo systemctl enable bambu-kiosk.service
+sudo reboot
+```
+
+- 日志：`sudo tail -f /tmp/bambu-kiosk.log`（kiosk 下 journal 抓不到应用输出，
+  服务用 `StandardOutput=append:` 落盘）
+- 验证部署版本：`cat ~/bambu-lab-app-linux-arm64/build-info.txt` 对照 git SHA
+
+**关键经验（踩坑总结）**：
+
+| 问题 | 原因 | 解法 |
+|------|------|------|
+| 锁屏密码绕不过 | 老 Phosh 锁屏无开关 | kiosk 模式根本不用 Phosh |
+| `Permission denied` / libseat 错 | 服务缺 seat 授权 | 必须带 `PAMName=login` |
+| phoc 选 Wayland 后端 | 设了 `WAYLAND_DISPLAY` | 不要设它；用 `WLR_BACKENDS=drm,libinput` |
+| rotate=90 半边黑 / 180 崩溃 | Adreno 306/freedreno 的旋转渲染 bug | **合成器不旋转**，应用内 `RotatedBox` 旋转（已内置） |
+| 黑屏排查 | 旋转/渲染组合问题 | 服务加 `Environment=BAMBU_NO_ROTATE=1` 临时关旋转定位 |
+| squeekboard 不弹键盘 | kiosk 下 input-method 协议不通 | 应用内 `flutter_onscreen_keyboard` 虚拟键盘（已集成） |
+| `pd-mapper.service` failed | 基带固件服务（无关显示） | 可忽略；或 `sudo systemctl mask pd-mapper` |
+
+#### 模式 B：Phosh 模式（备选，保留完整手机 UI）
+
+保留 Phosh 桌面，用 XDG autostart 启动应用（适合还想当手机用的场景；
+注意锁屏在旧版 Phosh 上无法跳过）：
 
 ```bash
 mkdir -p ~/.config/autostart
@@ -209,12 +289,12 @@ printf '%s\n' \
   （连续 5 次 5 秒内崩溃则放弃），日志：`~/.cache/bambu_lab_app/autostart.log`
 - 卸载自启：`rm ~/.config/autostart/bambu-lab-app.desktop`
 
-### 常见问题
+### 常见问题（通用）
 
 | 现象 | 原因 | 对策 |
 |------|------|------|
 | `version GLIBC_2.3x not found` | 包不是 bullseye 容器构建 | 用最新 CI 产物 |
-| 启动即段错误 | SSH 运行（无显示会话） | 在 Phosh 终端里跑 |
+| 启动即段错误 | SSH 运行（无显示会话） | 在图形界面终端里跑 |
 | `./run.sh: 权限不够` | 解压剥了执行位 | `chmod +x` 或改用 tar 解压 |
 | DartWorker 线程 sqlite3 段错误 | 旧包（sqlite3 双副本 bug） | 重新下载最新包 |
 | 自启没反应 | 脚本无执行位 / Exec 路径错 | `chmod +x`；检查 .desktop |

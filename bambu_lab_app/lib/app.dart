@@ -78,9 +78,10 @@ class BambuLabApp extends StatelessWidget {
                               ? RotatedBox(
                                   quarterTurns: 1,
                                   child: OnscreenKeyboard(
-                                    // 固定宽度避免 MediaQuery 在 Overlay 上下文
-                                    // 不准导致键盘溢出屏幕边缘
-                                    width: (_) => 360,
+                                    // kiosk 旋转层内：横屏空间 640 逻辑宽。
+                                    // 不能用 MediaQuery（旋转内仍报竖屏 360），
+                                    // 直接按旋转后宽度固定。
+                                    width: (_) => 640,
                                     theme: const OnscreenKeyboardThemeData(
                                         useSafeArea: false),
                                     child: child!,
