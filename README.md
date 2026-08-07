@@ -219,7 +219,7 @@ ConditionPathExists=/dev/tty0
 
 [Service]
 Environment=WLR_BACKENDS=drm,libinput
-ExecStart=/usr/bin/phoc -S -C /etc/phosh/phoc.ini -E "bash -lc 'squeekboard & /home/mobian/bambu-lab-app-linux-arm64/run.sh'"
+ExecStart=/usr/bin/phoc -S -C /etc/phosh/phoc.ini -E "bash -lc '/home/mobian/bambu-lab-app-linux-arm64/inference_server/start_server.sh & squeekboard & /home/mobian/bambu-lab-app-linux-arm64/run.sh'"
 Restart=always
 RestartSec=3
 User=1000
@@ -266,6 +266,15 @@ sudo reboot
 | 黑屏排查 | 旋转/渲染组合问题 | 服务加 `Environment=BAMBU_NO_ROTATE=1` 临时关旋转定位 |
 | squeekboard 不弹键盘 | kiosk 下 input-method 协议不通 | 应用内 `flutter_onscreen_keyboard` 虚拟键盘（已集成） |
 | `pd-mapper.service` failed | 基带固件服务（无关显示） | 可忽略；或 `sudo systemctl mask pd-mapper` |
+
+**AI 检测服务**（打包在 artifact 的 `inference_server/` 内，炒面/拉丝检测）：
+
+- 随 kiosk 一起启动（上面的 ExecStart 已内置拉起），端口 **19530**
+- **首次运行**自动建 venv 装依赖（需联网；前置：`sudo apt install -y python3.11-venv python3-full`）
+- 接口：`POST /analyze`（图片 → JSON 异常结果）、`POST /visualize`（图片 → 画框图）、`GET /health`
+- 模型：`inference_server/best.onnx`（随包分发，放仓库 `bambu_lab_app/tools/inference_server/best.onnx` 才会被打包）
+- 手动测试：`curl -X POST --data-binary @test.jpg http://127.0.0.1:19530/analyze`
+- 内存提醒：1GB 手机同时跑 Flutter + 推理服务偏紧；若 kiosk 崩溃，把服务挪到电脑跑，Flutter 改调 `http://<PC-IP>:19530`
 
 #### 模式 B：Phosh 模式（备选，保留完整手机 UI）
 

@@ -115,6 +115,13 @@ jobs:
             chmod +x "$ARTIFACT/mobian_autostart.sh"
           fi
 
+          # YOLO 推理服务（AI 检测炒面/拉丝）。start_server.sh 首次运行
+          # 自动建 venv 装依赖（需联网）；best.onnx 随包分发。
+          if [ -d tools/inference_server ]; then
+            cp -r tools/inference_server "$ARTIFACT/inference_server"
+            chmod +x "$ARTIFACT/inference_server/start_server.sh"
+          fi
+
           printf '%s\n' \
             "Bambu Lab App — Linux ARM64" \
             "" \
@@ -130,6 +137,11 @@ jobs:
             "  sudo apt-get install libgtk-3-0 libsqlite3-0" \
             "" \
             "数据目录: ~/.local/share/bambu_lab_app/" \
+            "" \
+            "AI 检测服务 (端口 19530):" \
+            "  已随包内置，kiosk 自启时一并拉起" \
+            "  首次运行自动建 venv 装依赖（需联网）" \
+            "  手动启动: ./inference_server/start_server.sh" \
             > "$ARTIFACT/README.txt"
 
           # 构建信息：记录 git SHA，方便核对 artifact 是否来自最新代码
