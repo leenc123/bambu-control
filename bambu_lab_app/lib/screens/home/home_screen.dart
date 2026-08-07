@@ -43,31 +43,41 @@ class _HomeScreenState extends State<HomeScreen> {
     final c = NeuoTheme.of(context);
     return Scaffold(
       backgroundColor: c.background,
-      body: Consumer<PrinterConfigProvider>(
-        builder: (_, cp, __) {
-          if (cp.isLoading) return const Center(child: _LoadingView());
-          if (cp.error != null) return _ErrorView(msg: cp.error!, onRetry: () => cp.loadPrinters(), c: c);
-          final list = cp.printers;
-          if (list.isEmpty) return const _EmptyView();
-          return RefreshIndicator(
-            onRefresh: () => cp.loadPrinters(),
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 78),
-              itemCount: list.length,
-              itemBuilder: (_, i) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _PrinterTile(
-                  printer: list[i],
-                  isOnline: cp.isOnline(list[i].id),
-                  onTap: () => _tap(context, cp, list[i]),
-                  onDelete: () => _del(context, cp, list[i]),
-                  disabled: _connecting,  // 连接中禁用点击
-                  c: c,
+      body: Stack(
+        children: [
+          Consumer<PrinterConfigProvider>(
+            builder: (_, cp, __) {
+              if (cp.isLoading) return const Center(child: _LoadingView());
+              if (cp.error != null) return _ErrorView(msg: cp.error!, onRetry: () => cp.loadPrinters(), c: c);
+              final list = cp.printers;
+              if (list.isEmpty) return const _EmptyView();
+              return RefreshIndicator(
+                onRefresh: () => cp.loadPrinters(),
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 78),
+                  itemCount: list.length,
+                  itemBuilder: (_, i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _PrinterTile(
+                      printer: list[i],
+                      isOnline: cp.isOnline(list[i].id),
+                      onTap: () => _tap(context, cp, list[i]),
+                      onDelete: () => _del(context, cp, list[i]),
+                      disabled: _connecting,  // 连接中禁用点击
+                      c: c,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          );
-        },
+              );
+            },
+          ),
+          // 左下角：网络设置入口（与右下角"添加"按钮齐平，kiosk 换 WiFi 用）
+          Positioned(
+            bottom: 16,
+            left: 16,
+            child: _WifiButton(onPressed: () => context.push('/wifi'), c: c),
+          ),
+        ],
       ),
       floatingActionButton: _AddButton(onPressed: () => context.push('/connect'), c: c),
     );
@@ -179,6 +189,47 @@ class _AddButtonState extends State<_AddButton> {
             Text('添加', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: widget.c.accent)),
           ]),
         ),
+      ),
+    );
+  }
+}
+
+// ---- WiFi 设置按钮 ----
+class _WifiButton extends StatefulWidget {
+  const _WifiButton({required this.onPressed, required this.c});
+  final VoidCallback onPressed;
+  final NeuoColors c;
+
+  @override
+  State<_WifiButton> createState() => _WifiButtonState();
+}
+
+class _WifiButtonState extends State<_WifiButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.c.background,
+          borderRadius: 12,
+          depth: _pressed ? 2 : 5,
+          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(LucideIcons.wifi, size: 20, color: widget.c.accent),
+          const SizedBox(width: 8),
+          Text('网络',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: widget.c.accent)),
+        ]),
       ),
     );
   }

@@ -13,6 +13,7 @@ import 'package:bambu_lab_app/screens/connect/connect_screen.dart';
 import 'package:bambu_lab_app/screens/dashboard/dashboard_screen.dart';
 import 'package:bambu_lab_app/screens/home/home_screen.dart';
 import 'package:bambu_lab_app/screens/splash/splash_screen.dart';
+import 'package:bambu_lab_app/screens/wifi/wifi_screen.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 import 'package:flutter_onscreen_keyboard/flutter_onscreen_keyboard.dart';
 
@@ -27,6 +28,7 @@ class BambuLabApp extends StatelessWidget {
       GoRoute(path: '/connect', builder: (_, __) => const ConnectScreen()),
       GoRoute(path: '/connect/:id',
           builder: (_, s) => ConnectScreen(editId: int.tryParse(s.pathParameters['id']!))),
+      GoRoute(path: '/wifi', builder: (_, __) => const WifiScreen()),
       GoRoute(path: '/dashboard', builder: (_, __) => const DashboardScreen()),
     ],
   );
