@@ -70,7 +70,10 @@ class BambuLabApp extends StatelessWidget {
                           // （90° 半边黑、180° 崩溃）。RotatedBox 交换布局
                           // 约束，子内容按横屏尺寸布局，触摸命中自动跟随。
                           // 若画面上下颠倒，quarterTurns 改 3。
-                          child: Platform.isLinux
+                          // 运行时开关：kiosk 服务里设 BAMBU_NO_ROTATE=1
+                          // 可禁用旋转（排查黑屏/方向问题时用，无需重建）。
+                          child: (Platform.isLinux &&
+                                  Platform.environment['BAMBU_NO_ROTATE'] != '1')
                               ? RotatedBox(quarterTurns: 1, child: child!)
                               : child!,
                         ),

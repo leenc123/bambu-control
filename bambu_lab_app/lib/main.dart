@@ -96,6 +96,10 @@ void main() async {
     ));
   });
 
+  // 调试：kiosk 旋转开关状态（BAMBU_NO_ROTATE=1 时禁用旋转）
+  debugPrint(
+      'KIOSK: rotate=${Platform.isLinux && Platform.environment['BAMBU_NO_ROTATE'] != '1'}');
+
   runApp(
     MultiProvider(
       providers: [
