@@ -25,6 +25,7 @@ class PrinterState {
     this.printSpeed = 100,
     this.firmwareVersion,
     this.serialNumber,
+    this.rtspUrl,
     this.printErrorCode,
     this.gcodeFile,
     this.subtaskName,
@@ -51,6 +52,9 @@ class PrinterState {
   final int printSpeed;
   final String? firmwareVersion;
   final String? serialNumber;
+
+  /// 打印机推送的 RTSP 摄像头地址（RTSP 机型；null = 无/禁用）
+  final String? rtspUrl;
   final String? printErrorCode;
   final String? gcodeFile;
   final String? subtaskName;
@@ -82,6 +86,7 @@ class PrinterState {
     int? printSpeed,
     String? firmwareVersion,
     String? serialNumber,
+    String? rtspUrl,
     String? printErrorCode,
     String? gcodeFile,
     String? subtaskName,
@@ -108,6 +113,7 @@ class PrinterState {
       printSpeed: printSpeed ?? this.printSpeed,
       firmwareVersion: firmwareVersion ?? this.firmwareVersion,
       serialNumber: serialNumber ?? this.serialNumber,
+      rtspUrl: rtspUrl ?? this.rtspUrl,
       printErrorCode: printErrorCode ?? this.printErrorCode,
       gcodeFile: gcodeFile ?? this.gcodeFile,
       subtaskName: subtaskName ?? this.subtaskName,
@@ -168,6 +174,7 @@ class PrinterState {
         subtaskName: print.containsKey('subtask_name') ? print['subtask_name']?.toString() : base.subtaskName,
         currentStageId: print.containsKey('stg_cur') ? _toInt(print['stg_cur']) ?? -1 : base.currentStageId,
         stageQueue: print.containsKey('stg') ? _parseStageQueue(print['stg']) : base.stageQueue,
+        rtspUrl: print.containsKey('ipcam') ? _parseRtspUrl(print['ipcam']) : base.rtspUrl,
         online: true,
       );
     }
@@ -197,6 +204,13 @@ class PrinterState {
       }
     }
     return false;
+  }
+
+  /// 从 print.ipcam 解析 RTSP 地址；"disable" 或缺失返回 null
+  static String? _parseRtspUrl(dynamic ipcam) {
+    if (ipcam is! Map<String, dynamic>) return null;
+    final url = ipcam['rtsp_url'];
+    return (url is String && url != 'disable') ? url : null;
   }
 
   /// 解析 wifi_signal（去掉 dBm 后缀）

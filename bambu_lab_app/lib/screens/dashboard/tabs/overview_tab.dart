@@ -12,7 +12,7 @@ import 'package:bambu_lab_app/models/print_status.dart';
 import 'package:bambu_lab_app/providers/printer_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 import 'package:bambu_lab_app/utils/printer_image.dart';
-
+import 'package:bambu_lab_app/widgets/ai_status_badge.dart';
 const _orange = Color(0xFFF5A623);
 const _green = Color(0xFF6FCF97);
 const _red = Color(0xFFEB5757);
@@ -215,6 +215,11 @@ class _TempsCard extends StatelessWidget {
                 ),
               ),
             ]),
+          ]),
+          const SizedBox(height: 4),
+          // AI 检测服务状态（在线状态下方，右对齐，5 秒轮询）
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            const AiStatusBadge(interval: Duration(seconds: 5)),
           ]),
           const SizedBox(height: 6),
           Expanded(

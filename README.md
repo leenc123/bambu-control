@@ -219,7 +219,7 @@ ConditionPathExists=/dev/tty0
 
 [Service]
 Environment=WLR_BACKENDS=drm,libinput
-ExecStart=/usr/bin/phoc -S -C /etc/phosh/phoc.ini -E "bash -lc '/home/mobian/bambu-lab-app-linux-arm64/inference_server/start_server.sh & squeekboard & /home/mobian/bambu-lab-app-linux-arm64/run.sh'"
+ExecStart=/usr/bin/phoc -S -C /etc/phosh/phoc.ini -E "bash -lc '/home/mobian/bambu-lab-app-linux-arm64/kiosk-start.sh'"
 Restart=always
 RestartSec=3
 User=1000
@@ -254,6 +254,9 @@ sudo reboot
 - 日志：`sudo tail -f /tmp/bambu-kiosk.log`（kiosk 下 journal 抓不到应用输出，
   服务用 `StandardOutput=append:` 落盘）
 - 验证部署版本：`cat ~/bambu-lab-app-linux-arm64/build-info.txt` 对照 git SHA
+- **启动链**：`kiosk-start.sh`（随包分发）依次拉起推理服务 → squeekboard → 应用。
+  服务 ExecStart 只调它——**保持短行**，长命令在粘贴/编辑时折行会导致
+  `bad unit file setting`（实测踩过）。新增自启组件改脚本即可，不动服务文件。
 
 **关键经验（踩坑总结）**：
 
@@ -269,10 +272,12 @@ sudo reboot
 
 **AI 检测服务**（打包在 artifact 的 `inference_server/` 内，炒面/拉丝检测）：
 
-- 随 kiosk 一起启动（上面的 ExecStart 已内置拉起），端口 **19530**
+- 随 kiosk 一起启动（`kiosk-start.sh` 拉起，端口 **19530**）
 - **首次运行**自动建 venv 装依赖（需联网；前置：`sudo apt install -y python3.11-venv python3-full`）
 - 接口：`POST /analyze`（图片 → JSON 异常结果）、`POST /visualize`（图片 → 画框图）、`GET /health`
 - 模型：`inference_server/best.onnx`（随包分发，放仓库 `bambu_lab_app/tools/inference_server/best.onnx` 才会被打包）
+- 手动启动测试：`./inference_server/start_server.sh`；验证：`curl http://127.0.0.1:19530/health`
+- 内存提醒：1GB 手机同时跑 Flutter + 推理服务偏紧；若 kiosk 崩溃，把服务挪到电脑跑，Flutter 改调 `http://<PC-IP>:19530`
 - 手动测试：`curl -X POST --data-binary @test.jpg http://127.0.0.1:19530/analyze`
 - 内存提醒：1GB 手机同时跑 Flutter + 推理服务偏紧；若 kiosk 崩溃，把服务挪到电脑跑，Flutter 改调 `http://<PC-IP>:19530`
 

@@ -13,7 +13,7 @@ import 'package:bambu_lab_app/screens/dashboard/tabs/control_tab.dart';
 import 'package:bambu_lab_app/screens/dashboard/tabs/overview_tab.dart';
 import 'package:bambu_lab_app/screens/dashboard/tabs/files_tab.dart';
 import 'package:bambu_lab_app/screens/dashboard/tabs/settings_tab.dart';
-import 'package:bambu_lab_app/theme/neuo_theme.dart';
+import 'package:bambu_lab_app/screens/dashboard/tabs/ai_tab.dart';import 'package:bambu_lab_app/theme/neuo_theme.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -30,6 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ('控制', LucideIcons.slidersHorizontal),
     ('AMS', LucideIcons.packageOpen),
     ('文件', LucideIcons.folderOpen),
+    ('AI', LucideIcons.cpu),
     ('设置', LucideIcons.settings),
   ];
 
@@ -42,7 +43,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: Consumer<PrinterProvider>(
         builder: (_, printer, __) {
           if (!printer.isConnected) return _DisconnectedView(c: c);
-          return Row(children: [
+          return Row(
+            // 撑满高度：内容矮的 Tab（如 AI 配置）不会被垂直居中
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Container(
               width: 64,
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -60,7 +64,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             VerticalDivider(width: 1, thickness: 1, color: c.textSecondary.withValues(alpha: 0.12)),
             Expanded(child: _tab(printer)),
-          ]);
+            ],
+          );
         },
       ),
     );
@@ -71,7 +76,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     1 => ControlTab(printer: p),
     2 => const AmsTab(),
     3 => const FilesTab(),
-    4 => const SettingsTab(),
+    4 => const AiTab(),
+    5 => const SettingsTab(),
     _ => OverviewTab(printer: p),
   };
 }

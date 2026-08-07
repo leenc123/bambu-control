@@ -53,6 +53,9 @@ class PrinterDao extends DatabaseAccessor<AppDatabase>
       accessCode: Value(config.accessCode),
       useTls: Value(config.useTls),
       printerType: Value(config.printerType.value),
+      aiConfidenceThreshold: Value(config.aiConfidenceThreshold),
+      aiMaxConsecutive: Value(config.aiMaxConsecutive),
+      aiAutoPause: Value(config.aiAutoPause),
       lastConnected: Value(config.lastConnected),
       createdAt: Value(config.createdAt ?? DateTime.now()),
     );
@@ -71,6 +74,9 @@ class PrinterDao extends DatabaseAccessor<AppDatabase>
       accessCode: Value(config.accessCode),
       useTls: Value(config.useTls),
       printerType: Value(config.printerType.value),
+      aiConfidenceThreshold: Value(config.aiConfidenceThreshold),
+      aiMaxConsecutive: Value(config.aiMaxConsecutive),
+      aiAutoPause: Value(config.aiAutoPause),
       lastConnected: Value(config.lastConnected),
     ));
     return rowsAffected > 0;
@@ -108,6 +114,9 @@ class PrinterDao extends DatabaseAccessor<AppDatabase>
       accessCode: row.accessCode,
       useTls: row.useTls,
       printerType: PrinterType.fromValue(row.printerType),
+      aiConfidenceThreshold: row.aiConfidenceThreshold,
+      aiMaxConsecutive: row.aiMaxConsecutive,
+      aiAutoPause: row.aiAutoPause,
       lastConnected: row.lastConnected,
       createdAt: row.createdAt,
     );

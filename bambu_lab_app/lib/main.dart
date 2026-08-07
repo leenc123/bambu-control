@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'package:bambu_lab_app/app.dart';
 import 'package:bambu_lab_app/db/database.dart';
+import 'package:bambu_lab_app/providers/ai_monitor_provider.dart';
 import 'package:bambu_lab_app/providers/ams_provider.dart';
 import 'package:bambu_lab_app/providers/printer_config_provider.dart';
 import 'package:bambu_lab_app/providers/printer_provider.dart';
@@ -111,6 +112,9 @@ void main() async {
           value: printerProvider,
         ),
         ChangeNotifierProvider<AmsProvider>.value(value: amsProvider),
+        ChangeNotifierProvider<AiMonitorProvider>(
+          create: (_) => AiMonitorProvider(printerProvider, configProvider),
+        ),
         ChangeNotifierProvider<ThemeModeProvider>(
           create: (_) => ThemeModeProvider(),
         ),

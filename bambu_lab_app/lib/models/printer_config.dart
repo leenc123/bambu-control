@@ -10,6 +10,9 @@ class PrinterConfig {
     required this.accessCode,
     this.useTls = true,
     this.printerType = PrinterType.unknown,
+    this.aiConfidenceThreshold = 0.5,
+    this.aiMaxConsecutive = 3,
+    this.aiAutoPause = true,
     this.lastConnected,
     this.createdAt,
   });
@@ -27,6 +30,17 @@ class PrinterConfig {
   /// 打印机型号（连接后从 MQTT 获取或手动选择）
   final PrinterType printerType;
 
+  // ---- AI 检测配置 ----
+
+  /// 检测置信度阈值（0~1），高于此值才算检出异常，默认 0.5
+  final double aiConfidenceThreshold;
+
+  /// 最大连续检出次数，连续超过该次数才判定为打印缺陷，默认 3
+  final int aiMaxConsecutive;
+
+  /// 判定缺陷后是否自动暂停打印，默认 true
+  final bool aiAutoPause;
+
   final DateTime? lastConnected;
   final DateTime? createdAt;
 
@@ -42,6 +56,9 @@ class PrinterConfig {
     String? accessCode,
     bool? useTls,
     PrinterType? printerType,
+    double? aiConfidenceThreshold,
+    int? aiMaxConsecutive,
+    bool? aiAutoPause,
     DateTime? lastConnected,
     DateTime? createdAt,
   }) {
@@ -53,6 +70,9 @@ class PrinterConfig {
       accessCode: accessCode ?? this.accessCode,
       useTls: useTls ?? this.useTls,
       printerType: printerType ?? this.printerType,
+      aiConfidenceThreshold: aiConfidenceThreshold ?? this.aiConfidenceThreshold,
+      aiMaxConsecutive: aiMaxConsecutive ?? this.aiMaxConsecutive,
+      aiAutoPause: aiAutoPause ?? this.aiAutoPause,
       lastConnected: lastConnected ?? this.lastConnected,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -68,6 +88,9 @@ class PrinterConfig {
       accessCode: map['access_code'] as String? ?? '',
       useTls: map['use_tls'] == 1 || map['use_tls'] == true,
       printerType: PrinterType.fromValue(map['printer_type'] as String?),
+      aiConfidenceThreshold: (map['ai_confidence_threshold'] as num?)?.toDouble() ?? 0.5,
+      aiMaxConsecutive: (map['ai_max_consecutive'] as num?)?.toInt() ?? 3,
+      aiAutoPause: map['ai_auto_pause'] == 1 || map['ai_auto_pause'] == true,
       lastConnected: map['last_connected'] != null
           ? DateTime.tryParse(map['last_connected'].toString())
           : null,
@@ -87,6 +110,9 @@ class PrinterConfig {
       'access_code': accessCode,
       'use_tls': useTls ? 1 : 0,
       'printer_type': printerType.value,
+      'ai_confidence_threshold': aiConfidenceThreshold,
+      'ai_max_consecutive': aiMaxConsecutive,
+      'ai_auto_pause': aiAutoPause ? 1 : 0,
       'last_connected': lastConnected?.toIso8601String(),
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };

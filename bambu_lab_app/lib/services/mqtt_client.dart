@@ -705,6 +705,17 @@ class BambuMqttClient {
   Map<String, dynamic> get printData =>
       (_data['print'] as Map<String, dynamic>?) ?? const {};
 
+  /// 获取当前状态的摄像头 ipcam 子字典（含 rtsp_url 等）
+  Map<String, dynamic> get cameraData =>
+      (printData['ipcam'] as Map<String, dynamic>?) ?? const {};
+
+  /// 打印机推送的 RTSP 摄像头地址（RTSP 机型）。
+  /// "disable" 表示摄像头被禁用，返回 null。
+  String? get rtspUrl {
+    final url = cameraData['rtsp_url'];
+    return (url is String && url != 'disable') ? url : null;
+  }
+
   /// 获取当前状态的 info 子字典
   Map<String, dynamic> get infoData =>
       (_data['info'] as Map<String, dynamic>?) ?? const {};

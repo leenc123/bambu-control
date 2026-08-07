@@ -131,6 +131,12 @@ class PrinterService {
   String? get firmwareVersion => _state.firmwareVersion;
   int get printSpeed => _state.printSpeed;
 
+  /// 打印机推送的 RTSP 摄像头地址（RTSP 机型；null = 无/禁用）
+  String? get rtspUrl => _mqtt.rtspUrl;
+
+  /// 摄像头取帧方式（按机型映射，见 [PrinterType.cameraKind]）
+  CameraKind get cameraKind => _state.printerType.cameraKind;
+
   // --- 打印控制 ---
 
   /// 开始打印 3MF 文件

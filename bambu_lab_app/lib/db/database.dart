@@ -23,6 +23,13 @@ class Printers extends Table {
   BoolColumn get useTls => boolean().withDefault(const Constant(true))();
   TextColumn get printerType =>
       text().withDefault(const Constant('UNKNOWN'))();
+  // ---- AI 检测配置（每台打印机独立）----
+  RealColumn get aiConfidenceThreshold =>
+      real().withDefault(const Constant(0.5))();
+  IntColumn get aiMaxConsecutive =>
+      integer().withDefault(const Constant(3))();
+  BoolColumn get aiAutoPause =>
+      boolean().withDefault(const Constant(true))();
   DateTimeColumn get lastConnected => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 }
@@ -41,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -62,6 +69,18 @@ class AppDatabase extends _$AppDatabase {
           if (from < 4) {
             // v3 -> v4: 添加调试日志表
             await m.createTable(debugLogEntries);
+          }
+          if (from < 5) {
+            // v4 -> v5: AI 检测配置（阈值 / 最大连续检出 / 自动暂停）
+            await m.database.customStatement(
+              'ALTER TABLE printers ADD COLUMN ai_confidence_threshold REAL NOT NULL DEFAULT 0.5',
+            );
+            await m.database.customStatement(
+              'ALTER TABLE printers ADD COLUMN ai_max_consecutive INTEGER NOT NULL DEFAULT 3',
+            );
+            await m.database.customStatement(
+              'ALTER TABLE printers ADD COLUMN ai_auto_pause INTEGER NOT NULL DEFAULT 1',
+            );
           }
         },
       );

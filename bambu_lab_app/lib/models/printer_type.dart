@@ -56,19 +56,25 @@ enum PrinterType {
       };
 
   /// 是否有摄像头
-  /// A1/A1 Mini/A2L: JPEG 帧拉取 (端口 6000)
-  /// P1S/P1P/X1 系列: RTSP 流
-  bool get hasCamera => switch (this) {
+  /// A1/A1 Mini/A2L/P1P/P1S: 6000 端口 TLS 长连接拉 JPEG 帧
+  /// X1/X1C/X1E: RTSP 流（URL 由 MQTT print.ipcam.rtsp_url 推送）
+  bool get hasCamera => cameraKind != CameraKind.none;
+
+  /// 摄像头取帧方式（与 ha-bambulab 的 CAMERA_RTSP / CAMERA_IMAGE 特性对齐）
+  ///
+  /// 参考: https://github.com/greghesp/ha-bambulab
+  /// - X1/X1C/X1E → RTSP 流 (rtsps://bblp:code@host:322/streaming/live/1)
+  /// - A1/A1 Mini/A2L/P1P/P1S → 6000 端口 TLS 长连接持续收 JPEG 帧
+  CameraKind get cameraKind => switch (this) {
         PrinterType.a1Mini ||
         PrinterType.a1 ||
         PrinterType.a2l ||
-        PrinterType.p1s ||
         PrinterType.p1p ||
-        PrinterType.x1 ||
-        PrinterType.x1c ||
-        PrinterType.x1e =>
-          true,
-        _ => false,
+        PrinterType.p1s =>
+          CameraKind.tls6000,
+        PrinterType.x1 || PrinterType.x1c || PrinterType.x1e =>
+          CameraKind.rtsp,
+        _ => CameraKind.none,
       };
 
   /// 是否有箱体温度传感器
@@ -111,4 +117,20 @@ enum NozzleType {
         NozzleType.stainlessSteel => '不锈钢喷嘴',
         NozzleType.hardenedSteel => '硬化钢喷嘴',
       };
+}
+
+/// 摄像头取帧方式（对应 ha-bambulab 的 CAMERA_RTSP / CAMERA_IMAGE 特性）
+///
+/// 参考: https://github.com/greghesp/ha-bambulab
+/// - CAMERA_RTSP  (X1/X1C/X1E) → RTSP 流
+/// - CAMERA_IMAGE (A1/A1 Mini/A2L/P1P/P1S) → 6000 端口 TLS 长连接收 JPEG 帧
+enum CameraKind {
+  /// 6000 端口 TLS 原始协议长连接（A1/A1 Mini/A2L/P1P/P1S）
+  tls6000,
+
+  /// RTSP 实时流（X1/X1C/X1E），URL 由 MQTT print.ipcam.rtsp_url 推送
+  rtsp,
+
+  /// 无摄像头
+  none,
 }

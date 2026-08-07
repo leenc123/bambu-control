@@ -100,6 +100,45 @@ class $PrintersTable extends Printers with TableInfo<$PrintersTable, Printer> {
     requiredDuringInsert: false,
     defaultValue: const Constant('UNKNOWN'),
   );
+  static const VerificationMeta _aiConfidenceThresholdMeta =
+      const VerificationMeta('aiConfidenceThreshold');
+  @override
+  late final GeneratedColumn<double> aiConfidenceThreshold =
+      GeneratedColumn<double>(
+        'ai_confidence_threshold',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0.5),
+      );
+  static const VerificationMeta _aiMaxConsecutiveMeta = const VerificationMeta(
+    'aiMaxConsecutive',
+  );
+  @override
+  late final GeneratedColumn<int> aiMaxConsecutive = GeneratedColumn<int>(
+    'ai_max_consecutive',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(3),
+  );
+  static const VerificationMeta _aiAutoPauseMeta = const VerificationMeta(
+    'aiAutoPause',
+  );
+  @override
+  late final GeneratedColumn<bool> aiAutoPause = GeneratedColumn<bool>(
+    'ai_auto_pause',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("ai_auto_pause" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _lastConnectedMeta = const VerificationMeta(
     'lastConnected',
   );
@@ -132,6 +171,9 @@ class $PrintersTable extends Printers with TableInfo<$PrintersTable, Printer> {
     accessCode,
     useTls,
     printerType,
+    aiConfidenceThreshold,
+    aiMaxConsecutive,
+    aiAutoPause,
     lastConnected,
     createdAt,
   ];
@@ -194,6 +236,33 @@ class $PrintersTable extends Printers with TableInfo<$PrintersTable, Printer> {
         ),
       );
     }
+    if (data.containsKey('ai_confidence_threshold')) {
+      context.handle(
+        _aiConfidenceThresholdMeta,
+        aiConfidenceThreshold.isAcceptableOrUnknown(
+          data['ai_confidence_threshold']!,
+          _aiConfidenceThresholdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ai_max_consecutive')) {
+      context.handle(
+        _aiMaxConsecutiveMeta,
+        aiMaxConsecutive.isAcceptableOrUnknown(
+          data['ai_max_consecutive']!,
+          _aiMaxConsecutiveMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ai_auto_pause')) {
+      context.handle(
+        _aiAutoPauseMeta,
+        aiAutoPause.isAcceptableOrUnknown(
+          data['ai_auto_pause']!,
+          _aiAutoPauseMeta,
+        ),
+      );
+    }
     if (data.containsKey('last_connected')) {
       context.handle(
         _lastConnectedMeta,
@@ -248,6 +317,18 @@ class $PrintersTable extends Printers with TableInfo<$PrintersTable, Printer> {
         DriftSqlType.string,
         data['${effectivePrefix}printer_type'],
       )!,
+      aiConfidenceThreshold: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}ai_confidence_threshold'],
+      )!,
+      aiMaxConsecutive: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ai_max_consecutive'],
+      )!,
+      aiAutoPause: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}ai_auto_pause'],
+      )!,
       lastConnected: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_connected'],
@@ -273,6 +354,9 @@ class Printer extends DataClass implements Insertable<Printer> {
   final String accessCode;
   final bool useTls;
   final String printerType;
+  final double aiConfidenceThreshold;
+  final int aiMaxConsecutive;
+  final bool aiAutoPause;
   final DateTime? lastConnected;
   final DateTime createdAt;
   const Printer({
@@ -283,6 +367,9 @@ class Printer extends DataClass implements Insertable<Printer> {
     required this.accessCode,
     required this.useTls,
     required this.printerType,
+    required this.aiConfidenceThreshold,
+    required this.aiMaxConsecutive,
+    required this.aiAutoPause,
     this.lastConnected,
     required this.createdAt,
   });
@@ -296,6 +383,9 @@ class Printer extends DataClass implements Insertable<Printer> {
     map['access_code'] = Variable<String>(accessCode);
     map['use_tls'] = Variable<bool>(useTls);
     map['printer_type'] = Variable<String>(printerType);
+    map['ai_confidence_threshold'] = Variable<double>(aiConfidenceThreshold);
+    map['ai_max_consecutive'] = Variable<int>(aiMaxConsecutive);
+    map['ai_auto_pause'] = Variable<bool>(aiAutoPause);
     if (!nullToAbsent || lastConnected != null) {
       map['last_connected'] = Variable<DateTime>(lastConnected);
     }
@@ -312,6 +402,9 @@ class Printer extends DataClass implements Insertable<Printer> {
       accessCode: Value(accessCode),
       useTls: Value(useTls),
       printerType: Value(printerType),
+      aiConfidenceThreshold: Value(aiConfidenceThreshold),
+      aiMaxConsecutive: Value(aiMaxConsecutive),
+      aiAutoPause: Value(aiAutoPause),
       lastConnected: lastConnected == null && nullToAbsent
           ? const Value.absent()
           : Value(lastConnected),
@@ -332,6 +425,11 @@ class Printer extends DataClass implements Insertable<Printer> {
       accessCode: serializer.fromJson<String>(json['accessCode']),
       useTls: serializer.fromJson<bool>(json['useTls']),
       printerType: serializer.fromJson<String>(json['printerType']),
+      aiConfidenceThreshold: serializer.fromJson<double>(
+        json['aiConfidenceThreshold'],
+      ),
+      aiMaxConsecutive: serializer.fromJson<int>(json['aiMaxConsecutive']),
+      aiAutoPause: serializer.fromJson<bool>(json['aiAutoPause']),
       lastConnected: serializer.fromJson<DateTime?>(json['lastConnected']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
@@ -347,6 +445,9 @@ class Printer extends DataClass implements Insertable<Printer> {
       'accessCode': serializer.toJson<String>(accessCode),
       'useTls': serializer.toJson<bool>(useTls),
       'printerType': serializer.toJson<String>(printerType),
+      'aiConfidenceThreshold': serializer.toJson<double>(aiConfidenceThreshold),
+      'aiMaxConsecutive': serializer.toJson<int>(aiMaxConsecutive),
+      'aiAutoPause': serializer.toJson<bool>(aiAutoPause),
       'lastConnected': serializer.toJson<DateTime?>(lastConnected),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
@@ -360,6 +461,9 @@ class Printer extends DataClass implements Insertable<Printer> {
     String? accessCode,
     bool? useTls,
     String? printerType,
+    double? aiConfidenceThreshold,
+    int? aiMaxConsecutive,
+    bool? aiAutoPause,
     Value<DateTime?> lastConnected = const Value.absent(),
     DateTime? createdAt,
   }) => Printer(
@@ -370,6 +474,9 @@ class Printer extends DataClass implements Insertable<Printer> {
     accessCode: accessCode ?? this.accessCode,
     useTls: useTls ?? this.useTls,
     printerType: printerType ?? this.printerType,
+    aiConfidenceThreshold: aiConfidenceThreshold ?? this.aiConfidenceThreshold,
+    aiMaxConsecutive: aiMaxConsecutive ?? this.aiMaxConsecutive,
+    aiAutoPause: aiAutoPause ?? this.aiAutoPause,
     lastConnected: lastConnected.present
         ? lastConnected.value
         : this.lastConnected,
@@ -388,6 +495,15 @@ class Printer extends DataClass implements Insertable<Printer> {
       printerType: data.printerType.present
           ? data.printerType.value
           : this.printerType,
+      aiConfidenceThreshold: data.aiConfidenceThreshold.present
+          ? data.aiConfidenceThreshold.value
+          : this.aiConfidenceThreshold,
+      aiMaxConsecutive: data.aiMaxConsecutive.present
+          ? data.aiMaxConsecutive.value
+          : this.aiMaxConsecutive,
+      aiAutoPause: data.aiAutoPause.present
+          ? data.aiAutoPause.value
+          : this.aiAutoPause,
       lastConnected: data.lastConnected.present
           ? data.lastConnected.value
           : this.lastConnected,
@@ -405,6 +521,9 @@ class Printer extends DataClass implements Insertable<Printer> {
           ..write('accessCode: $accessCode, ')
           ..write('useTls: $useTls, ')
           ..write('printerType: $printerType, ')
+          ..write('aiConfidenceThreshold: $aiConfidenceThreshold, ')
+          ..write('aiMaxConsecutive: $aiMaxConsecutive, ')
+          ..write('aiAutoPause: $aiAutoPause, ')
           ..write('lastConnected: $lastConnected, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
@@ -420,6 +539,9 @@ class Printer extends DataClass implements Insertable<Printer> {
     accessCode,
     useTls,
     printerType,
+    aiConfidenceThreshold,
+    aiMaxConsecutive,
+    aiAutoPause,
     lastConnected,
     createdAt,
   );
@@ -434,6 +556,9 @@ class Printer extends DataClass implements Insertable<Printer> {
           other.accessCode == this.accessCode &&
           other.useTls == this.useTls &&
           other.printerType == this.printerType &&
+          other.aiConfidenceThreshold == this.aiConfidenceThreshold &&
+          other.aiMaxConsecutive == this.aiMaxConsecutive &&
+          other.aiAutoPause == this.aiAutoPause &&
           other.lastConnected == this.lastConnected &&
           other.createdAt == this.createdAt);
 }
@@ -446,6 +571,9 @@ class PrintersCompanion extends UpdateCompanion<Printer> {
   final Value<String> accessCode;
   final Value<bool> useTls;
   final Value<String> printerType;
+  final Value<double> aiConfidenceThreshold;
+  final Value<int> aiMaxConsecutive;
+  final Value<bool> aiAutoPause;
   final Value<DateTime?> lastConnected;
   final Value<DateTime> createdAt;
   const PrintersCompanion({
@@ -456,6 +584,9 @@ class PrintersCompanion extends UpdateCompanion<Printer> {
     this.accessCode = const Value.absent(),
     this.useTls = const Value.absent(),
     this.printerType = const Value.absent(),
+    this.aiConfidenceThreshold = const Value.absent(),
+    this.aiMaxConsecutive = const Value.absent(),
+    this.aiAutoPause = const Value.absent(),
     this.lastConnected = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
@@ -467,6 +598,9 @@ class PrintersCompanion extends UpdateCompanion<Printer> {
     required String accessCode,
     this.useTls = const Value.absent(),
     this.printerType = const Value.absent(),
+    this.aiConfidenceThreshold = const Value.absent(),
+    this.aiMaxConsecutive = const Value.absent(),
+    this.aiAutoPause = const Value.absent(),
     this.lastConnected = const Value.absent(),
     required DateTime createdAt,
   }) : name = Value(name),
@@ -482,6 +616,9 @@ class PrintersCompanion extends UpdateCompanion<Printer> {
     Expression<String>? accessCode,
     Expression<bool>? useTls,
     Expression<String>? printerType,
+    Expression<double>? aiConfidenceThreshold,
+    Expression<int>? aiMaxConsecutive,
+    Expression<bool>? aiAutoPause,
     Expression<DateTime>? lastConnected,
     Expression<DateTime>? createdAt,
   }) {
@@ -493,6 +630,10 @@ class PrintersCompanion extends UpdateCompanion<Printer> {
       if (accessCode != null) 'access_code': accessCode,
       if (useTls != null) 'use_tls': useTls,
       if (printerType != null) 'printer_type': printerType,
+      if (aiConfidenceThreshold != null)
+        'ai_confidence_threshold': aiConfidenceThreshold,
+      if (aiMaxConsecutive != null) 'ai_max_consecutive': aiMaxConsecutive,
+      if (aiAutoPause != null) 'ai_auto_pause': aiAutoPause,
       if (lastConnected != null) 'last_connected': lastConnected,
       if (createdAt != null) 'created_at': createdAt,
     });
@@ -506,6 +647,9 @@ class PrintersCompanion extends UpdateCompanion<Printer> {
     Value<String>? accessCode,
     Value<bool>? useTls,
     Value<String>? printerType,
+    Value<double>? aiConfidenceThreshold,
+    Value<int>? aiMaxConsecutive,
+    Value<bool>? aiAutoPause,
     Value<DateTime?>? lastConnected,
     Value<DateTime>? createdAt,
   }) {
@@ -517,6 +661,10 @@ class PrintersCompanion extends UpdateCompanion<Printer> {
       accessCode: accessCode ?? this.accessCode,
       useTls: useTls ?? this.useTls,
       printerType: printerType ?? this.printerType,
+      aiConfidenceThreshold:
+          aiConfidenceThreshold ?? this.aiConfidenceThreshold,
+      aiMaxConsecutive: aiMaxConsecutive ?? this.aiMaxConsecutive,
+      aiAutoPause: aiAutoPause ?? this.aiAutoPause,
       lastConnected: lastConnected ?? this.lastConnected,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -546,6 +694,17 @@ class PrintersCompanion extends UpdateCompanion<Printer> {
     if (printerType.present) {
       map['printer_type'] = Variable<String>(printerType.value);
     }
+    if (aiConfidenceThreshold.present) {
+      map['ai_confidence_threshold'] = Variable<double>(
+        aiConfidenceThreshold.value,
+      );
+    }
+    if (aiMaxConsecutive.present) {
+      map['ai_max_consecutive'] = Variable<int>(aiMaxConsecutive.value);
+    }
+    if (aiAutoPause.present) {
+      map['ai_auto_pause'] = Variable<bool>(aiAutoPause.value);
+    }
     if (lastConnected.present) {
       map['last_connected'] = Variable<DateTime>(lastConnected.value);
     }
@@ -565,6 +724,9 @@ class PrintersCompanion extends UpdateCompanion<Printer> {
           ..write('accessCode: $accessCode, ')
           ..write('useTls: $useTls, ')
           ..write('printerType: $printerType, ')
+          ..write('aiConfidenceThreshold: $aiConfidenceThreshold, ')
+          ..write('aiMaxConsecutive: $aiMaxConsecutive, ')
+          ..write('aiAutoPause: $aiAutoPause, ')
           ..write('lastConnected: $lastConnected, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
@@ -900,6 +1062,9 @@ typedef $$PrintersTableCreateCompanionBuilder =
       required String accessCode,
       Value<bool> useTls,
       Value<String> printerType,
+      Value<double> aiConfidenceThreshold,
+      Value<int> aiMaxConsecutive,
+      Value<bool> aiAutoPause,
       Value<DateTime?> lastConnected,
       required DateTime createdAt,
     });
@@ -912,6 +1077,9 @@ typedef $$PrintersTableUpdateCompanionBuilder =
       Value<String> accessCode,
       Value<bool> useTls,
       Value<String> printerType,
+      Value<double> aiConfidenceThreshold,
+      Value<int> aiMaxConsecutive,
+      Value<bool> aiAutoPause,
       Value<DateTime?> lastConnected,
       Value<DateTime> createdAt,
     });
@@ -957,6 +1125,21 @@ class $$PrintersTableFilterComposer
 
   ColumnFilters<String> get printerType => $composableBuilder(
     column: $table.printerType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get aiConfidenceThreshold => $composableBuilder(
+    column: $table.aiConfidenceThreshold,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get aiMaxConsecutive => $composableBuilder(
+    column: $table.aiMaxConsecutive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get aiAutoPause => $composableBuilder(
+    column: $table.aiAutoPause,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1015,6 +1198,21 @@ class $$PrintersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get aiConfidenceThreshold => $composableBuilder(
+    column: $table.aiConfidenceThreshold,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get aiMaxConsecutive => $composableBuilder(
+    column: $table.aiMaxConsecutive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get aiAutoPause => $composableBuilder(
+    column: $table.aiAutoPause,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get lastConnected => $composableBuilder(
     column: $table.lastConnected,
     builder: (column) => ColumnOrderings(column),
@@ -1057,6 +1255,21 @@ class $$PrintersTableAnnotationComposer
 
   GeneratedColumn<String> get printerType => $composableBuilder(
     column: $table.printerType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get aiConfidenceThreshold => $composableBuilder(
+    column: $table.aiConfidenceThreshold,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get aiMaxConsecutive => $composableBuilder(
+    column: $table.aiMaxConsecutive,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get aiAutoPause => $composableBuilder(
+    column: $table.aiAutoPause,
     builder: (column) => column,
   );
 
@@ -1104,6 +1317,9 @@ class $$PrintersTableTableManager
                 Value<String> accessCode = const Value.absent(),
                 Value<bool> useTls = const Value.absent(),
                 Value<String> printerType = const Value.absent(),
+                Value<double> aiConfidenceThreshold = const Value.absent(),
+                Value<int> aiMaxConsecutive = const Value.absent(),
+                Value<bool> aiAutoPause = const Value.absent(),
                 Value<DateTime?> lastConnected = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => PrintersCompanion(
@@ -1114,6 +1330,9 @@ class $$PrintersTableTableManager
                 accessCode: accessCode,
                 useTls: useTls,
                 printerType: printerType,
+                aiConfidenceThreshold: aiConfidenceThreshold,
+                aiMaxConsecutive: aiMaxConsecutive,
+                aiAutoPause: aiAutoPause,
                 lastConnected: lastConnected,
                 createdAt: createdAt,
               ),
@@ -1126,6 +1345,9 @@ class $$PrintersTableTableManager
                 required String accessCode,
                 Value<bool> useTls = const Value.absent(),
                 Value<String> printerType = const Value.absent(),
+                Value<double> aiConfidenceThreshold = const Value.absent(),
+                Value<int> aiMaxConsecutive = const Value.absent(),
+                Value<bool> aiAutoPause = const Value.absent(),
                 Value<DateTime?> lastConnected = const Value.absent(),
                 required DateTime createdAt,
               }) => PrintersCompanion.insert(
@@ -1136,6 +1358,9 @@ class $$PrintersTableTableManager
                 accessCode: accessCode,
                 useTls: useTls,
                 printerType: printerType,
+                aiConfidenceThreshold: aiConfidenceThreshold,
+                aiMaxConsecutive: aiMaxConsecutive,
+                aiAutoPause: aiAutoPause,
                 lastConnected: lastConnected,
                 createdAt: createdAt,
               ),

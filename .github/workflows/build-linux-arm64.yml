@@ -115,6 +115,12 @@ jobs:
             chmod +x "$ARTIFACT/mobian_autostart.sh"
           fi
 
+          # kiosk 会话启动脚本（推理服务 + 键盘 + 应用；ExecStart 只调它，避免长行折行）
+          if [ -f tools/kiosk-start.sh ]; then
+            cp tools/kiosk-start.sh "$ARTIFACT/"
+            chmod +x "$ARTIFACT/kiosk-start.sh"
+          fi
+
           # YOLO 推理服务（AI 检测炒面/拉丝）。start_server.sh 首次运行
           # 自动建 venv 装依赖（需联网）；best.onnx 随包分发。
           if [ -d tools/inference_server ]; then

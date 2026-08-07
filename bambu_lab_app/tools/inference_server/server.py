@@ -227,9 +227,7 @@ class YOLOHandler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
 
-            box_colors = {
-                "spaghetti": "#FF4444",
-            }
+            palette = ["#FF4444", "#FFA500", "#44FF44", "#4488FF"]
 
             for det in detections:
                 conf = det["confidence"]
@@ -240,14 +238,14 @@ class YOLOHandler(BaseHTTPRequestHandler):
                 # Guard against invalid bbox
                 x1, x2 = min(x1, x2), max(x1, x2)
                 y1, y2 = min(y1, y2), max(y1, y2)
-                cls_name = det["class_name"]
-                color = box_colors.get(cls_name, "#FF4444")
+                cls_id = det["class_id"]
+                color = palette[cls_id % len(palette)]
 
                 # Draw box
                 draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
 
                 # Draw label background
-                label = f"{cls_name} {conf:.0%}"
+                label = f"{det['class_name']} {conf:.0%}"
                 label_bbox = draw.textbbox((0, 0), label, font=font)
                 label_w = label_bbox[2] - label_bbox[0]
                 label_h = label_bbox[3] - label_bbox[1]
@@ -299,7 +297,7 @@ class YOLOHandler(BaseHTTPRequestHandler):
     @staticmethod
     def _postprocess(predictions: np.ndarray, orig_w: int, orig_h: int,
                      ratio: float, pad: tuple[int, int]) -> list[dict]:
-        num_classes = len(YOLO_CLASS_NAMES)
+        num_classes = len(YOLOHandler.class_names)
         pred = np.squeeze(predictions, axis=0)
         pred = np.transpose(pred)
         box_data = pred[:, :4]
