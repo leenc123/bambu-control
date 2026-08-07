@@ -1,6 +1,8 @@
 /// Bambu Lab App - 应用配置 + 路由
 library;
 
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -63,7 +65,14 @@ class BambuLabApp extends StatelessWidget {
                         colors: brightness == Brightness.dark ? NeuoColors.dark : NeuoColors.light,
                         child: SafeArea(
                           left: true, right: true, top: false, bottom: false,
-                          child: child!,
+                          // kiosk（Linux 竖屏输出）内容旋转 90° 呈现横屏：
+                          // phoc 的 rotate 在 Adreno 306/freedreno 上不可靠
+                          // （90° 半边黑、180° 崩溃）。RotatedBox 交换布局
+                          // 约束，子内容按横屏尺寸布局，触摸命中自动跟随。
+                          // 若画面上下颠倒，quarterTurns 改 3。
+                          child: Platform.isLinux
+                              ? RotatedBox(quarterTurns: 1, child: child!)
+                              : child!,
                         ),
                       ),
                       if (ss.isActive)
