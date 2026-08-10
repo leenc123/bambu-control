@@ -52,6 +52,13 @@ class _WifiScreenState extends State<WifiScreen> {
       return;
     }
     await _refresh();
+    // 启动竞态兑底：开屏判定时 WiFi 尚未连上、扫描完成时已连上 →
+    // 根路由下自动继续启动流程，不再停在配网页
+    if (mounted &&
+        !Navigator.of(context).canPop() &&
+        _currentSsid != null) {
+      _continueFlow();
+    }
   }
 
   Future<void> _refresh() async {

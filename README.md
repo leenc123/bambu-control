@@ -219,7 +219,10 @@ ConditionPathExists=/dev/tty0
 
 [Service]
 Environment=WLR_BACKENDS=drm,libinput
-ExecStart=/usr/bin/phoc -S -C /etc/phosh/phoc.ini -E "bash -lc '/home/mobian/bambu-lab-app-linux-arm64/kiosk-start.sh'"
+# 注意：老版 phoc（bullseye）没有 -S/--shell 选项，加了会报
+# "Unknown option -S" 直接退出 → kiosk 循环重启、重启后进命令行无 GUI。
+# Kiosk 场景本就不需要 shell 接入，不要加。
+ExecStart=/usr/bin/phoc -C /etc/phosh/phoc.ini -E "bash -lc '/home/mobian/bambu-lab-app-linux-arm64/kiosk-start.sh'"
 Restart=always
 RestartSec=3
 User=1000
@@ -263,6 +266,7 @@ sudo reboot
 | 问题 | 原因 | 解法 |
 |------|------|------|
 | 锁屏密码绕不过 | 老 Phosh 锁屏无开关 | kiosk 模式根本不用 Phosh |
+| 重启后进命令行、kiosk 循环重启 | phoc 报 `Unknown option -S`：老版 phoc（bullseye）无 `-S` 选项 | 服务 ExecStart 去掉 `-S`（服务文件内有注释说明） |
 | `Permission denied` / libseat 错 | 服务缺 seat 授权 | 必须带 `PAMName=login` |
 | phoc 选 Wayland 后端 | 设了 `WAYLAND_DISPLAY` | 不要设它；用 `WLR_BACKENDS=drm,libinput` |
 | rotate=90 半边黑 / 180 崩溃 | Adreno 306/freedreno 的旋转渲染 bug | **合成器不旋转**，应用内 `RotatedBox` 旋转（已内置） |
