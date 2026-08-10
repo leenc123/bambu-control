@@ -36,10 +36,26 @@ class WifiNetwork {
 class WifiService {
   WifiService._();
 
+  /// 统一执行 nmcli：强制 C locale
+  ///
+  /// 系统为中文 locale 时，nmcli 会把 yes/no 输出成“是/否”（实测
+  /// `是:newtai21`），导致 active==yes 解析失败 → 明明连上 WiFi 却
+  /// 显示未连接、列表不标记已连接。所有 nmcli 调用都走这里保证英文输出。
+  static Future<ProcessResult> _nmcli(
+    List<String> args, {
+    Encoding stdoutEncoding = utf8,
+    Encoding stderrEncoding = utf8,
+  }) {
+    return Process.run('nmcli', args,
+        environment: const {'LC_ALL': 'C'},
+        stdoutEncoding: stdoutEncoding,
+        stderrEncoding: stderrEncoding);
+  }
+
   /// nmcli 是否可用（未安装 NetworkManager 时返回 false）
   static Future<bool> isAvailable() async {
     try {
-      final res = await Process.run('nmcli', ['--version']);
+      final res = await _nmcli(['--version']);
       return res.exitCode == 0;
     } catch (_) {
       return false;
@@ -49,9 +65,9 @@ class WifiService {
   /// 当前连接的 SSID；未连接返回 null
   static Future<String?> currentSsid() async {
     try {
-      final res = await Process.run('nmcli', [
+      final res = await _nmcli([
         '-t', '-f', 'active,ssid', 'dev', 'wifi',
-      ], stdoutEncoding: utf8);
+      ]);
       if (res.exitCode != 0) return null;
       final lines = (res.stdout as String).split('\n');
       for (final line in lines) {
@@ -71,10 +87,10 @@ class WifiService {
   static Future<List<WifiNetwork>> scan() async {
     final connected = await currentSsid();
     try {
-      final res = await Process.run('nmcli', [
+      final res = await _nmcli([
         '-t', '-f', 'SSID,SECURITY,SIGNAL,BSSID', 'dev', 'wifi',
         'list', '--rescan', 'yes',
-      ], stdoutEncoding: utf8, stderrEncoding: utf8);
+      ]);
       if (res.exitCode != 0) return [];
       final lines = (res.stdout as String).split('\n');
       final bySsid = <String, WifiNetwork>{};
@@ -113,8 +129,7 @@ class WifiService {
   /// 手机可能通过 USB 共享/以太网联网，此时 `dev wifi` 里没有活动网络。
   static Future<bool> hasConnection() async {
     try {
-      final res = await Process.run('nmcli', ['-t', '-f', 'STATE', 'g'],
-          stdoutEncoding: utf8, stderrEncoding: utf8);
+      final res = await _nmcli(['-t', '-f', 'STATE', 'g']);
       if (res.exitCode != 0) return false;
       final state = (res.stdout as String).trim().toLowerCase();
       // connected / connected (site only) / connected (local only)
@@ -154,11 +169,7 @@ class WifiService {
       if (password != null && password.isNotEmpty) {
         args.addAll(['password', password]);
       }
-      final res = await Process.run(
-        'nmcli', args,
-        stdoutEncoding: utf8,
-        stderrEncoding: utf8,
-      );
+      final res = await _nmcli(args);
       if (res.exitCode == 0) return null;
       final err = (res.stderr as String).trim();
       final out = (res.stdout as String).trim();
