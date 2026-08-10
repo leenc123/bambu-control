@@ -110,22 +110,26 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       // 网络检查：nmcli 不存在（如桌面开发环境）时跳过，不阻塞启动
       final nmcliOk = await WifiService.isAvailable();
+      debugPrint('[START] 启动决策 nmcliOk=$nmcliOk printers=${cp.printers.length}');
       if (nmcliOk) {
-        // 开机竞态：kiosk 随系统启动，NetworkManager 可能还在连接保存的 WiFi，
+        // 开机竞态：kiosk 随系统启动，NetworkManager 可能还在连接保存的网络，
         // 只查一次必然误判“无网络” → 每次都进配网页。轮询几秒再判定。
-        String? ssid;
+        // 用通用连接状态（WiFi/以太网/USB 共享任一算有网）。
+        var connected = false;
         for (var i = 0; i < 6; i++) {
-          ssid = await WifiService.currentSsid();
-          if (ssid != null || !mounted) break;
+          connected = await WifiService.hasConnection();
+          debugPrint('[START] 网络轮询 #$i connected=$connected');
+          if (connected || !mounted) break;
           await Future.delayed(const Duration(seconds: 1));
         }
-        if (ssid == null) dest = '/wifi';
+        if (!connected) dest = '/wifi';
       }
     } catch (_) {
       // 网络检查失败不阻塞启动
     }
     if (!mounted) return;
     dest ??= cp.printers.isEmpty ? '/connect' : '/';
+    debugPrint('[START] 启动去向: $dest');
     context.go(dest);
   }
 

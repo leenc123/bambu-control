@@ -8,6 +8,8 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 /// 扫描结果中的单个网络
 class WifiNetwork {
   const WifiNetwork({
@@ -104,6 +106,27 @@ class WifiService {
       return list;
     } catch (_) {
       return [];
+    }
+  }
+
+  /// 是否有已激活的网络连接（WiFi / 以太网 / USB 共享任一即可）
+  ///
+  /// 用 `nmcli -t -f STATE g` 的通用连接状态，而不是只查 WiFi 活动 SSID——
+  /// 手机可能通过 USB 共享/以太网联网，此时 `dev wifi` 里没有活动网络。
+  static Future<bool> hasConnection() async {
+    try {
+      final res = await Process.run('nmcli', ['-t', '-f', 'STATE', 'g'],
+          stdoutEncoding: utf8, stderrEncoding: utf8);
+      final state = (res.stdout as String).trim().toLowerCase();
+      // 探针：输出会进 /tmp/bambu-kiosk.log（kiosk 服务 StandardOutput=append）
+      debugPrint('[WIFI] nmcli state: exit=${res.exitCode} '
+          'out="$state" err="${(res.stderr as String).trim()}"');
+      if (res.exitCode != 0) return false;
+      // connected / connected (site only) / connected (local only)
+      return state.startsWith('connected');
+    } catch (e) {
+      debugPrint('[WIFI] nmcli 状态查询异常: $e');
+      return false;
     }
   }
 

@@ -6,6 +6,8 @@
 /// （flutter-pi 无物理/系统键盘，不能直接用原生 TextField）。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_neumorphism_ui/flutter_neumorphism_ui.dart';
 import 'package:flutter_onscreen_keyboard/flutter_onscreen_keyboard.dart';
@@ -32,10 +34,19 @@ class _WifiScreenState extends State<WifiScreen> {
   List<WifiNetwork> _networks = [];
   String? _error;
 
+  /// 根路由（启动流程）下监听网络就绪，一就绪自动继续
+  Timer? _watchTimer;
+
   @override
   void initState() {
     super.initState();
     _init();
+  }
+
+  @override
+  void dispose() {
+    _watchTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _init() async {
@@ -52,11 +63,35 @@ class _WifiScreenState extends State<WifiScreen> {
       return;
     }
     await _refresh();
-    // 启动竞态兑底：开屏判定时 WiFi 尚未连上、扫描完成时已连上 →
+    // 启动竞态兑底：开屏判定时网络尚未就绪、加载完成时已就绪 →
     // 根路由下自动继续启动流程，不再停在配网页
-    if (mounted &&
-        !Navigator.of(context).canPop() &&
-        _currentSsid != null) {
+    final hasNet = await WifiService.hasConnection();
+    if (!mounted) return;
+    final canPop = Navigator.of(context).canPop();
+    debugPrint('[WIFI] 配网页加载完成 canPop=$canPop hasConnection=$hasNet');
+    if (!canPop && hasNet) {
+      _continueFlow();
+      return;
+    }
+    // NM 连接慢（可能 10~30s）：挂监听，网络一就绪自动继续
+    if (!canPop) {
+      _watchTimer = Timer.periodic(
+          const Duration(seconds: 5), (_) => _watchNetwork());
+    }
+  }
+
+  /// 网络就绪监听（仅启动流程根路由；用户开始交互后自动停止）
+  Future<void> _watchNetwork() async {
+    if (!mounted || _connecting) return;
+    if (Navigator.of(context).canPop()) {
+      _watchTimer?.cancel();
+      return;
+    }
+    final ok = await WifiService.hasConnection();
+    if (!mounted) return;
+    if (ok) {
+      debugPrint('[WIFI] 监听：网络已就绪，继续启动流程');
+      _watchTimer?.cancel();
       _continueFlow();
     }
   }
@@ -93,6 +128,8 @@ class _WifiScreenState extends State<WifiScreen> {
 
   Future<void> _connect(WifiNetwork net) async {
     if (_connecting) return;
+    // 用户开始交互：停止自动监听，避免和用户操作竞争
+    _watchTimer?.cancel();
     String? password;
     if (!net.isOpen) {
       password = await _askPassword(net.ssid);
