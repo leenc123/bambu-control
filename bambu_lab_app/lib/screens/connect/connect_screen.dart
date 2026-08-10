@@ -1,6 +1,8 @@
 /// 连接编辑页（使用 flutter_neumorphism_ui）
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_neumorphism_ui/flutter_neumorphism_ui.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:bambu_lab_app/models/printer_config.dart';
 import 'package:bambu_lab_app/models/printer_type.dart';
 import 'package:bambu_lab_app/providers/printer_config_provider.dart';
+import 'package:bambu_lab_app/providers/printer_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 import 'package:flutter_onscreen_keyboard/flutter_onscreen_keyboard.dart';
 
@@ -36,22 +39,34 @@ class _ConnectScreenState extends State<ConnectScreen> {
   @override
   void initState() {
     super.initState();
-    _isEdit = widget.editId != null;
-    if (_isEdit) _load();
+    _load();
   }
 
   Future<void> _load() async {
     final cp = context.read<PrinterConfigProvider>();
-    final p = cp.printers.firstWhere((p) => p.id == widget.editId,
-        orElse: () => PrinterConfig(name: '', ip: '', serial: '', accessCode: ''));
+    PrinterConfig? p;
+    if (widget.editId != null) {
+      // 编辑指定设备；找不到则按新建处理（空表单）
+      for (final c in cp.printers) {
+        if (c.id == widget.editId) {
+          p = c;
+          break;
+        }
+      }
+      p ??= const PrinterConfig(name: '', ip: '', serial: '', accessCode: '');
+    } else if (cp.printers.isNotEmpty) {
+      // 单设备模式：无 editId 时取当前唯一配置，本页表现为“修改设备”
+      p = cp.printers.first;
+    }
     setState(() {
       _existing = p;
-      _nameCtrl.text = p.name;
-      _ipCtrl.text = p.ip;
-      _serialCtrl.text = p.serial;
-      _accessCodeCtrl.text = p.accessCode;
-      _useTls = p.useTls;
-      _printerType = p.printerType;
+      _isEdit = p != null && p.id != null;
+      _nameCtrl.text = p?.name ?? '';
+      _ipCtrl.text = p?.ip ?? '';
+      _serialCtrl.text = p?.serial ?? '';
+      _accessCodeCtrl.text = p?.accessCode ?? '';
+      _useTls = p?.useTls ?? true;
+      _printerType = p?.printerType ?? PrinterType.unknown;
     });
   }
 
@@ -79,13 +94,43 @@ class _ConnectScreenState extends State<ConnectScreen> {
       lastConnected: _existing?.lastConnected,
       createdAt: _existing?.createdAt,
     );
-    final ok = _isEdit ? await cp.updatePrinter(cfg) : (await cp.addPrinter(cfg)) != null;
+    final ok = await cp.saveSolePrinter(cfg);
+    if (!mounted) return;
+    if (!ok) {
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(cp.error ?? '保存失败'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // 保存成功 → 立即建立连接，成功进入设备详情；失败留在本页可修改/重试
+    final saved = cp.printers.isNotEmpty ? cp.printers.first : cfg;
+    final pp = context.read<PrinterProvider>();
+    pp.onPrinterTypeDetected = (type) {
+      final cur = cp.printers.isNotEmpty ? cp.printers.first : null;
+      if (cur != null) cp.updatePrinter(cur.copyWith(printerType: type));
+    };
+    bool connected = false;
+    bool timedOut = false;
+    try {
+      connected = await pp.connect(saved).timeout(const Duration(seconds: 30));
+    } on TimeoutException {
+      timedOut = true;
+    }
     if (!mounted) return;
     setState(() => _loading = false);
-    if (ok) {
+    if (connected) {
       context.go('/');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(cp.error ?? '保存失败'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(timedOut
+              ? '连接超时，请检查打印机是否在线'
+              : (pp.errorMessage ?? '连接失败，请检查配置')),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -129,7 +174,15 @@ class _ConnectScreenState extends State<ConnectScreen> {
               const Center(child: CircularProgressIndicator())
             else
               Row(children: [
-                Expanded(child: _BackButton(onPressed: () => context.go('/'), c: c)),
+                Expanded(child: _BackButton(onPressed: () {
+                  // 从设置推入（可返回）→ 返回；启动根路由 → 回主界面
+                  final nav = Navigator.of(context);
+                  if (nav.canPop()) {
+                    nav.pop();
+                  } else {
+                    context.go('/');
+                  }
+                }, c: c)),
                 const SizedBox(width: 12),
                 Expanded(child: _SaveButton(isEdit: _isEdit, onPressed: _save, c: c)),
               ]),

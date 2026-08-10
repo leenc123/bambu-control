@@ -11,7 +11,6 @@ import 'package:bambu_lab_app/providers/theme_provider.dart';
 import 'package:bambu_lab_app/providers/screen_saver_provider.dart';
 import 'package:bambu_lab_app/screens/connect/connect_screen.dart';
 import 'package:bambu_lab_app/screens/dashboard/dashboard_screen.dart';
-import 'package:bambu_lab_app/screens/home/home_screen.dart';
 import 'package:bambu_lab_app/screens/splash/splash_screen.dart';
 import 'package:bambu_lab_app/screens/wifi/wifi_screen.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
@@ -24,12 +23,12 @@ class BambuLabApp extends StatelessWidget {
     initialLocation: '/splash',
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
-      GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
+      // 单设备模式：/ 即设备详情主界面（连接页保存后 / 连接页返回均落在此处）
+      GoRoute(path: '/', builder: (_, __) => const DashboardScreen()),
       GoRoute(path: '/connect', builder: (_, __) => const ConnectScreen()),
       GoRoute(path: '/connect/:id',
           builder: (_, s) => ConnectScreen(editId: int.tryParse(s.pathParameters['id']!))),
       GoRoute(path: '/wifi', builder: (_, __) => const WifiScreen()),
-      GoRoute(path: '/dashboard', builder: (_, __) => const DashboardScreen()),
     ],
   );
 

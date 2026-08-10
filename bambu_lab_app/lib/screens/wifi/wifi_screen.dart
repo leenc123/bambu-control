@@ -2,13 +2,18 @@
 ///
 /// 通过 nmcli（NetworkManager）操作，适用于 Mobian/Phosh kiosk
 /// （无系统设置入口时更换网络用）。
-/// 键盘：app 全局已包 OnscreenKeyboard，输入框自动弹屏上键盘。
+/// 键盘：密码输入用 OnscreenKeyboardTextFormField，弹 app 内置英文键盘
+/// （flutter-pi 无物理/系统键盘，不能直接用原生 TextField）。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_neumorphism_ui/flutter_neumorphism_ui.dart';
+import 'package:flutter_onscreen_keyboard/flutter_onscreen_keyboard.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 
+import 'package:bambu_lab_app/providers/printer_config_provider.dart';
 import 'package:bambu_lab_app/services/wifi_service.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 
@@ -64,6 +69,21 @@ class _WifiScreenState extends State<WifiScreen> {
     });
   }
 
+  void _onBack() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      // 启动流程根路由：跳过配网继续下一步
+      _continueFlow();
+    }
+  }
+
+  /// 配网完成/跳过 → 继续启动流程（有设备进详情，无设备去配置）
+  void _continueFlow() {
+    final cp = context.read<PrinterConfigProvider>();
+    context.go(cp.printers.isEmpty ? '/connect' : '/');
+  }
+
   Future<void> _connect(WifiNetwork net) async {
     if (_connecting) return;
     String? password;
@@ -75,45 +95,106 @@ class _WifiScreenState extends State<WifiScreen> {
     final err = await WifiService.connect(net.ssid, password: password);
     if (!mounted) return;
     setState(() => _connecting = false);
-    if (err == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已连接到 ${net.ssid}，如打印机走 WiFi 请返回重新连接')),
-      );
-      await _refresh();
-    } else {
+    if (err != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(err), backgroundColor: const Color(0xFFF44336)),
       );
+      return;
     }
+    // 启动配网流程（根路由、无法返回）：连网成功自动推进下一步
+    if (!Navigator.of(context).canPop()) {
+      _continueFlow();
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已连接到 ${net.ssid}，如打印机走 WiFi 请返回重新连接')),
+    );
+    await _refresh();
   }
 
-  Future<String?> _askPassword(String ssid) {
+  Future<String?> _askPassword(String ssid) async {
     final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text('连接 $ssid'),
-        content: TextField(
-          controller: controller,
-          obscureText: true,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'WiFi 密码',
-            border: OutlineInputBorder(),
+    final c = NeuoTheme.of(context);
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          child: FlutterNeumorphism(
+            style: NeumorphismStyle(
+              color: c.background,
+              borderRadius: 18,
+              depth: 8,
+            ),
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: [
+                  Icon(LucideIcons.wifi, size: 18, color: c.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('连接 $ssid',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: c.textPrimary),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ]),
+                const SizedBox(height: 4),
+                Text('输入 WiFi 密码',
+                    style: TextStyle(fontSize: 12, color: c.textSecondary)),
+                const SizedBox(height: 12),
+                OnscreenKeyboardTextFormField(
+                  controller: controller,
+                  obscureText: true,
+                  style: TextStyle(fontSize: 14, color: c.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'WiFi 密码',
+                    hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: c.textSecondary.withValues(alpha: 0.4)),
+                    filled: true,
+                    fillColor: c.background,
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(
+                    child: _DialogBtn(
+                        label: '取消',
+                        accent: false,
+                        c: c,
+                        onTap: () => Navigator.of(ctx).pop()),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _DialogBtn(
+                        label: '连接',
+                        accent: true,
+                        c: c,
+                        onTap: () => Navigator.of(ctx).pop(controller.text)),
+                  ),
+                ]),
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(c).pop(),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(c).pop(controller.text),
-            child: const Text('连接', style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   @override
@@ -139,7 +220,7 @@ class _WifiScreenState extends State<WifiScreen> {
     return Row(children: [
       _IconButton(
         icon: LucideIcons.chevronLeft,
-        onTap: _connecting ? null : () => Navigator.of(context).maybePop(),
+        onTap: _connecting ? null : _onBack,
         c: c,
       ),
       const SizedBox(width: 8),
@@ -338,6 +419,59 @@ class _IconButtonState extends State<_IconButton> {
           ),
           padding: const EdgeInsets.all(8),
           child: Icon(widget.icon, size: 18, color: widget.c.accent),
+        ),
+      ),
+    );
+  }
+}
+
+/// 对话框按钮（拟物凸起 + 按压凹陷）
+class _DialogBtn extends StatefulWidget {
+  const _DialogBtn({
+    required this.label,
+    required this.accent,
+    required this.onTap,
+    required this.c,
+  });
+
+  final String label;
+  final bool accent;
+  final VoidCallback onTap;
+  final NeuoColors c;
+
+  @override
+  State<_DialogBtn> createState() => _DialogBtnState();
+}
+
+class _DialogBtnState extends State<_DialogBtn> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: FlutterNeumorphism(
+        style: NeumorphismStyle(
+          color: widget.c.background,
+          borderRadius: 12,
+          depth: _pressed ? 2 : 5,
+          type: _pressed ? NeumorphismType.pressed : NeumorphismType.flat,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: widget.accent ? widget.c.accent : widget.c.textSecondary,
+            ),
+          ),
         ),
       ),
     );

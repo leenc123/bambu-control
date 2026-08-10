@@ -6,7 +6,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
+import 'package:provider/provider.dart';
 
+import 'package:bambu_lab_app/providers/printer_config_provider.dart';
+import 'package:bambu_lab_app/services/wifi_service.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -90,15 +93,33 @@ class _SplashScreenState extends State<SplashScreen>
     // 文字动画结束后，稍等片刻再跳转
     _textController.addStatusListener((status) {
       if (status == AnimationStatus.completed && mounted) {
-        Future.delayed(const Duration(milliseconds: 800), () {
-          if (mounted) context.go('/');
-        });
+        Future.delayed(const Duration(milliseconds: 800), _go);
       }
     });
   }
 
   void _startTextAnimation() {
     _textController.forward();
+  }
+
+  /// 启动决策：无网络 → WiFi 配网；无设备 → 设备配置；否则直达设备详情
+  Future<void> _go() async {
+    if (!mounted) return;
+    final cp = context.read<PrinterConfigProvider>();
+    String? dest;
+    try {
+      // 网络检查：nmcli 不存在（如桌面开发环境）时跳过，不阻塞启动
+      final nmcliOk = await WifiService.isAvailable();
+      if (nmcliOk) {
+        final ssid = await WifiService.currentSsid();
+        if (ssid == null) dest = '/wifi';
+      }
+    } catch (_) {
+      // 网络检查失败不阻塞启动
+    }
+    if (!mounted) return;
+    dest ??= cp.printers.isEmpty ? '/connect' : '/';
+    context.go(dest);
   }
 
   Future<void> _loadVersion() async {

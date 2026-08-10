@@ -7,7 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
+import 'package:bambu_lab_app/providers/printer_config_provider.dart';
 import 'package:bambu_lab_app/providers/printer_provider.dart';
+import 'package:bambu_lab_app/services/wifi_service.dart';
 import 'package:bambu_lab_app/app_version.dart';
 import 'package:bambu_lab_app/providers/theme_provider.dart';
 import 'package:bambu_lab_app/theme/neuo_theme.dart';
@@ -26,6 +28,18 @@ class SettingsTab extends StatelessWidget {
         _sec('打印机', c),
         const SizedBox(height: 8),
         const _InfoCard(),
+        const SizedBox(height: 14),
+        _sec('网络', c),
+        const SizedBox(height: 8),
+        const _LocalIpTile(),
+        const SizedBox(height: 6),
+        _TileBtn(
+          icon: LucideIcons.wifi,
+          title: 'WiFi 网络',
+          subtitle: '扫描并连接无线网络',
+          c: c,
+          onTap: () => context.push('/wifi'),
+        ),
         const SizedBox(height: 14),
         _sec('应用', c),
         const SizedBox(height: 8),
@@ -46,9 +60,9 @@ class SettingsTab extends StatelessWidget {
         const SizedBox(height: 14),
         _sec('操作', c),
         const SizedBox(height: 8),
-        _TileBtn(icon: LucideIcons.pencil, title: '管理打印机', subtitle: '添加、编辑或删除打印机配置', c: c, onTap: () => context.go('/')),
+        _TileBtn(icon: LucideIcons.pencil, title: '管理打印机', subtitle: '修改当前打印机配置', c: c, onTap: () => _editCurrentDevice(context)),
         const SizedBox(height: 6),
-        _TileBtn(icon: LucideIcons.logOut, title: '断开连接', subtitle: '断开后自动返回打印机管理页面', c: c, onTap: () async {
+        _TileBtn(icon: LucideIcons.logOut, title: '断开连接', subtitle: '断开后进入当前设备编辑页面', c: c, onTap: () async {
           final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
             title: const Text('断开连接'), content: const Text('确定要断开与打印机的连接吗？'),
             actions: [
@@ -59,7 +73,11 @@ class SettingsTab extends StatelessWidget {
           ));
           if (ok == true && context.mounted) {
             await context.read<PrinterProvider>().disconnect();
-            if (context.mounted) context.go('/');
+            if (!context.mounted) return;
+            // 断开后直接进入当前设备编辑页面（保存后按流程重新连接）
+            final cp = context.read<PrinterConfigProvider>();
+            final id = cp.selected?.id ?? (cp.printers.isNotEmpty ? cp.printers.first.id : null);
+            context.go(id != null ? '/connect/$id' : '/connect');
           }
         }),
       ],
@@ -69,6 +87,17 @@ class SettingsTab extends StatelessWidget {
   Widget _sec(String t, NeuoColors c) => Align(
       alignment: Alignment.centerLeft,
       child: Text(t, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.textPrimary)));
+
+  /// 打开设备配置页（编辑当前设备；无设备则新建）
+  void _editCurrentDevice(BuildContext context) {
+    final cp = context.read<PrinterConfigProvider>();
+    final id = cp.selected?.id ?? (cp.printers.isNotEmpty ? cp.printers.first.id : null);
+    if (id != null) {
+      context.push('/connect/$id');
+    } else {
+      context.push('/connect');
+    }
+  }
 }
 
 // ---- 打印机信息卡片 ----
@@ -131,12 +160,12 @@ class _InfoCard extends StatelessWidget {
 
 // ---- 可点击卡片按钮 ----
 class _TileBtn extends StatefulWidget {
-  const _TileBtn({required this.icon, required this.title, required this.subtitle, required this.c, required this.onTap});
+  const _TileBtn({required this.icon, required this.title, required this.subtitle, required this.c, this.onTap});
   final IconData icon;
   final String title;
   final String subtitle;
   final NeuoColors c;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   State<_TileBtn> createState() => _TileBtnState();
@@ -147,13 +176,16 @@ class _TileBtnState extends State<_TileBtn> {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
     return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
+      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+      onTapUp: enabled
+          ? (_) {
+              setState(() => _pressed = false);
+              widget.onTap!();
+            }
+          : null,
+      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
       child: FlutterNeumorphism(
         style: NeumorphismStyle(
           color: widget.c.background,
@@ -186,8 +218,27 @@ class _TileBtnState extends State<_TileBtn> {
   }
 }
 
-// ---- 辅助摄像机开关 ----
+// ---- 本机 IP 展示 ----
+class _LocalIpTile extends StatelessWidget {
+  const _LocalIpTile();
 
+  @override
+  Widget build(BuildContext context) {
+    final c = NeuoTheme.of(context);
+    return FutureBuilder<String?>(
+      future: WifiService.localIp(),
+      builder: (context, snap) {
+        final ip = snap.data;
+        return _TileBtn(
+          icon: LucideIcons.network,
+          title: '本机 IP',
+          subtitle: (ip == null || ip.isEmpty) ? '未连接网络' : ip,
+          c: c,
+        );
+      },
+    );
+  }
+}
 
 // ---- 主题选择 ----
 class _ThemeSelector extends StatelessWidget {

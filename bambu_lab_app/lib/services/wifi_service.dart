@@ -107,6 +107,27 @@ class WifiService {
     }
   }
 
+  /// 本机 IP（第一个非回环 IPv4 地址）；无网络返回 null
+  static Future<String?> localIp() async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLinkLocal: false,
+      );
+      for (final iface in interfaces) {
+        for (final addr in iface.addresses) {
+          final ip = addr.address;
+          // 跳过回环与未命名地址（includeLinkLocal: false 已排除 169.254）
+          if (ip.isEmpty || ip.startsWith('127.')) continue;
+          return ip;
+        }
+      }
+    } catch (_) {
+      // 获取失败视为无网络
+    }
+    return null;
+  }
+
   /// 连接 WiFi；成功返回 null，失败返回可读错误信息。
   ///
   /// [password] 为 null 或空时按开放网络处理。

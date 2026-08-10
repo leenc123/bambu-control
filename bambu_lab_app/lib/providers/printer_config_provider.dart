@@ -151,6 +151,27 @@ class PrinterConfigProvider extends ChangeNotifier {
     }
   }
 
+  /// 单设备语义：保存唯一打印机配置
+  ///
+  /// 已有 id → 更新；无 id → 插入后删除其余旧配置（库中始终一条）。
+  Future<bool> saveSolePrinter(PrinterConfig config) async {
+    if (config.id != null) return updatePrinter(config);
+    try {
+      // insertPrinter 返回非空自增 id
+      final id = await _dao.insertPrinter(config);
+      final others = _printers.where((p) => p.id != id).toList();
+      for (final o in others) {
+        if (o.id != null) await _dao.deletePrinter(o.id!);
+      }
+      await loadPrinters();
+      return true;
+    } catch (e) {
+      _error = '保存打印机失败: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// 删除打印机
   Future<bool> deletePrinter(int id) async {
     try {
