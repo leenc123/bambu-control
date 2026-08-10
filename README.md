@@ -277,7 +277,7 @@ sudo reboot
 **AI 检测服务**（打包在 artifact 的 `inference_server/` 内，炒面/拉丝检测）：
 
 - 随 kiosk 一起启动（`kiosk-start.sh` 拉起，端口 **19530**）
-- **首次运行**自动建 venv 装依赖（需联网；前置：`sudo apt install -y python3.11-venv python3-full`）
+- **首次运行**自动建 venv 装依赖（需联网；前置：`sudo apt install -y python3-venv python3-full`）
 - 接口：`POST /analyze`（图片 → JSON 异常结果）、`POST /visualize`（图片 → 画框图）、`GET /health`
 - 模型：`inference_server/best.onnx`（随包分发，放仓库 `bambu_lab_app/tools/inference_server/best.onnx` 才会被打包）
 - 手动启动测试：`./inference_server/start_server.sh`；验证：`curl http://127.0.0.1:19530/health`
