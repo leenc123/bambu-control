@@ -8,8 +8,6 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-
 /// 扫描结果中的单个网络
 class WifiNetwork {
   const WifiNetwork({
@@ -117,15 +115,11 @@ class WifiService {
     try {
       final res = await Process.run('nmcli', ['-t', '-f', 'STATE', 'g'],
           stdoutEncoding: utf8, stderrEncoding: utf8);
-      final state = (res.stdout as String).trim().toLowerCase();
-      // 探针：输出会进 /tmp/bambu-kiosk.log（kiosk 服务 StandardOutput=append）
-      debugPrint('[WIFI] nmcli state: exit=${res.exitCode} '
-          'out="$state" err="${(res.stderr as String).trim()}"');
       if (res.exitCode != 0) return false;
+      final state = (res.stdout as String).trim().toLowerCase();
       // connected / connected (site only) / connected (local only)
       return state.startsWith('connected');
-    } catch (e) {
-      debugPrint('[WIFI] nmcli 状态查询异常: $e');
+    } catch (_) {
       return false;
     }
   }

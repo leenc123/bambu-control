@@ -67,14 +67,12 @@ class _WifiScreenState extends State<WifiScreen> {
     // 根路由下自动继续启动流程，不再停在配网页
     final hasNet = await WifiService.hasConnection();
     if (!mounted) return;
-    final canPop = Navigator.of(context).canPop();
-    debugPrint('[WIFI] 配网页加载完成 canPop=$canPop hasConnection=$hasNet');
-    if (!canPop && hasNet) {
-      _continueFlow();
-      return;
-    }
-    // NM 连接慢（可能 10~30s）：挂监听，网络一就绪自动继续
-    if (!canPop) {
+    if (!Navigator.of(context).canPop()) {
+      if (hasNet) {
+        _continueFlow();
+        return;
+      }
+      // NM 连接慢（可能 10~30s）：挂监听，网络一就绪自动继续
       _watchTimer = Timer.periodic(
           const Duration(seconds: 5), (_) => _watchNetwork());
     }
@@ -90,7 +88,6 @@ class _WifiScreenState extends State<WifiScreen> {
     final ok = await WifiService.hasConnection();
     if (!mounted) return;
     if (ok) {
-      debugPrint('[WIFI] 监听：网络已就绪，继续启动流程');
       _watchTimer?.cancel();
       _continueFlow();
     }
@@ -160,78 +157,87 @@ class _WifiScreenState extends State<WifiScreen> {
     final controller = TextEditingController();
     final c = NeuoTheme.of(context);
     try {
-      return await showDialog<String>(
+      // 用 showGeneralDialog 而不是 Dialog：避免 M3 圆角 Material 裁剪拟物阴影，
+      // 渲染效果和 connect 页的拟物表单一致。
+      return await showGeneralDialog<String>(
         context: context,
-        builder: (ctx) => Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-          child: FlutterNeumorphism(
-            style: NeumorphismStyle(
-              color: c.background,
-              borderRadius: 18,
-              depth: 8,
-            ),
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(children: [
-                  Icon(LucideIcons.wifi, size: 18, color: c.accent),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text('连接 $ssid',
-                        style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: c.textPrimary),
-                        overflow: TextOverflow.ellipsis),
-                  ),
-                ]),
-                const SizedBox(height: 4),
-                Text('输入 WiFi 密码',
-                    style: TextStyle(fontSize: 12, color: c.textSecondary)),
-                const SizedBox(height: 12),
-                OnscreenKeyboardTextFormField(
-                  controller: controller,
-                  obscureText: true,
-                  style: TextStyle(fontSize: 14, color: c.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'WiFi 密码',
-                    hintStyle: TextStyle(
-                        fontSize: 13,
-                        color: c.textSecondary.withValues(alpha: 0.4)),
-                    filled: true,
-                    fillColor: c.background,
-                    isDense: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
+        barrierDismissible: true,
+        barrierLabel: '关闭',
+        barrierColor: Colors.black54,
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (ctx, _, __) => Center(
+          child: Material(
+            type: MaterialType.transparency,
+            child: FlutterNeumorphism(
+              style: NeumorphismStyle(
+                color: c.background,
+                borderRadius: 16,
+                depth: 6,
+              ),
+              padding: const EdgeInsets.all(18),
+              child: SizedBox(
+                width: 340,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      Icon(LucideIcons.lock, size: 18, color: c.accent),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('连接 $ssid',
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: c.textPrimary),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text('输入 WiFi 密码',
+                        style: TextStyle(fontSize: 12, color: c.textSecondary)),
+                    const SizedBox(height: 12),
+                    OnscreenKeyboardTextFormField(
+                      controller: controller,
+                      // kiosk 触摸键盘输入，明文展示便于核对
+                      style: TextStyle(fontSize: 14, color: c.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: 'WiFi 密码',
+                        hintStyle: TextStyle(
+                            fontSize: 13,
+                            color: c.textSecondary.withValues(alpha: 0.4)),
+                        filled: true,
+                        fillColor: c.background,
+                        isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                      ),
                     ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  ),
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      Expanded(
+                        child: _DialogBtn(
+                            label: '取消',
+                            accent: false,
+                            c: c,
+                            onTap: () => Navigator.of(ctx).pop()),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _DialogBtn(
+                            label: '连接',
+                            accent: true,
+                            c: c,
+                            onTap: () => Navigator.of(ctx).pop(controller.text)),
+                      ),
+                    ]),
+                  ],
                 ),
-                const SizedBox(height: 14),
-                Row(children: [
-                  Expanded(
-                    child: _DialogBtn(
-                        label: '取消',
-                        accent: false,
-                        c: c,
-                        onTap: () => Navigator.of(ctx).pop()),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _DialogBtn(
-                        label: '连接',
-                        accent: true,
-                        c: c,
-                        onTap: () => Navigator.of(ctx).pop(controller.text)),
-                  ),
-                ]),
-              ],
+              ),
             ),
           ),
         ),
@@ -323,6 +329,7 @@ class _WifiScreenState extends State<WifiScreen> {
         padding: const EdgeInsets.only(bottom: 8),
         child: _NetworkTile(
           net: _networks[i],
+          currentSsid: _currentSsid,
           connecting: _connecting,
           c: c,
           onTap: () => _connect(_networks[i]),
@@ -336,12 +343,16 @@ class _WifiScreenState extends State<WifiScreen> {
 class _NetworkTile extends StatelessWidget {
   const _NetworkTile({
     required this.net,
+    required this.currentSsid,
     required this.connecting,
     required this.c,
     required this.onTap,
   });
 
   final WifiNetwork net;
+
+  /// 当前连接 SSID（扫描 flag 与页头状态双来源取并集，避免竞态漏标）
+  final String? currentSsid;
   final bool connecting;
   final NeuoColors c;
   final VoidCallback onTap;
@@ -349,7 +360,8 @@ class _NetworkTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final connectedColor = const Color(0xFF4CAF50);
-    final isConnected = net.connected;
+    final isConnected =
+        net.connected || (currentSsid != null && net.ssid == currentSsid);
     return GestureDetector(
       onTap: connecting ? null : onTap,
       child: Opacity(
@@ -387,9 +399,15 @@ class _NetworkTile extends StatelessWidget {
             _SignalBars(signal: net.signal, color: c.accent),
             const SizedBox(width: 12),
             if (isConnected)
-              Text('已连接',
-                  style: TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w700, color: connectedColor))
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(LucideIcons.circleCheck, size: 14, color: connectedColor),
+                const SizedBox(width: 4),
+                Text('已连接',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: connectedColor)),
+              ])
             else
               Icon(LucideIcons.chevronRight, size: 18, color: c.textSecondary),
           ]),
@@ -410,18 +428,23 @@ class _SignalBars extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = (signal / 25).ceil().clamp(0, 4);
     final lowColor = signal < 30 ? const Color(0xFFF44336) : color;
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      for (var i = 0; i < 4; i++)
-        Container(
-          width: 3,
-          height: 6.0 + i * 3,
-          margin: const EdgeInsets.only(right: 2),
-          decoration: BoxDecoration(
-            color: i < active ? lowColor : Colors.grey.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(1),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      // 底对齐：信号格从下往上生长（大众样式），默认垂直居中像直方图
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (var i = 0; i < 4; i++)
+          Container(
+            width: 3,
+            height: 6.0 + i * 3,
+            margin: const EdgeInsets.only(right: 2),
+            decoration: BoxDecoration(
+              color: i < active ? lowColor : Colors.grey.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(1),
+            ),
           ),
-        ),
-    ]);
+      ],
+    );
   }
 }
 
