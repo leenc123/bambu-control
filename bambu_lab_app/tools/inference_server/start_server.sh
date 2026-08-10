@@ -3,7 +3,7 @@
 #
 # 首次运行会自动创建 venv 并安装依赖（需联网，约 1-2 分钟）；
 # 前置：系统需有 python3-venv
-#   Debian/Mobian: sudo apt install -y python3.11-venv python3-full
+#   Debian/Mobian: sudo apt install -y python3-venv python3-full
 #
 # 用法:
 #   ./inference_server/start_server.sh                    # 默认端口 19530
@@ -26,7 +26,7 @@ fi
 if [ ! -x "$VENV/bin/python" ] || [ ! -f "$DEPS_OK" ]; then
   echo "[yolo] 初始化 venv + 安装依赖（首次运行，需联网）..."
   python3 -m venv "$VENV" || {
-    echo "[yolo] venv 创建失败，先安装 python3-venv: sudo apt install -y python3.11-venv" >&2
+    echo "[yolo] venv 创建失败，先安装 python3-venv: sudo apt install -y python3-venv" >&2
     exit 1
   }
   # 优先国内源，失败回退默认源
